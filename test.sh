@@ -1,0 +1,2 @@
+#nmap -sS -oX - --stats-every 5 --script cinema-* -d 10.20.30.11
+nmap -sS -n --stats-every 5 -p 21,22,80,111,5000,10000 --script cinema-* -d --script-args 'username=manager,password=password,getcerts=true' 10.20.26.11
