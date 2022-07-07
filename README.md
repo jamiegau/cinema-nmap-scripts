@@ -12,18 +12,21 @@ It would be appriciated if any issues spotted by users be posted to the ISSUES s
 
 ## Target Equipment
 The following is the initial set of equipment that scripts will be created for.
-- Dolby Cinema Players - `DONE` - Initial beta version done, needs testing by the community.
-- Barco/Cineionic Cinema Players
-- GDC Cinema Players - if licensing allows
-- Qube Cinema Players
-- NEC projectors
-- Barco/Cinionic Projectors
-- INTEG Jnior automation controllers
-- RLY8 automation controllers
-- QSC JSD60 and JSD80 cinema sound processors
-- More to come, please submit your own.....
 
-This will be the initial set of target devices.  Vendors are welcome to submit scripts to this Repo for addition to the scripts.
+| Vendor | type | Status | info |
+| --- | --- | --- | --- |
+| Dolby | Player | DONE | IMS1000, IMS2000, IMS3000 (DCP2000 and similar era kit unknwon.) Initial beta version done, needs testing by the community. |
+| Dolby | Sound Processor |   | CP750, CP850, CP950 |
+| Barco / Cinionic | Player |   | ICMP |
+| GDC | Player |   | SX2001A, SX3000, SR1000, SX4000 |
+| Qube | Player |   | XP-D |
+| NEC | Projectors |   | Series1 and Series2 projectors |
+| INTEG | Automation controler |   | JNIOR 400 |
+| RLY8 | Automation controler |   | generic IP based automation controler |
+| QSC-USL | Sound Processor |   | JSD80, JSD60 |
+| QSC | Sound Processor |   | Other |
+
+This will be the initial set of target devices.  Vendors and cinema engineers are welcome to submit scripts to this Repo for addition to the scripts.
 
 ## Example
 The following is an example of the initial script created.  This script targets the Dolby Cinema Players,  IMS1000, IMS2000 and is likely to work on DCP2000 and IMS3000 devices
