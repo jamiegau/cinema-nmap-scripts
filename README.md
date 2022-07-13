@@ -44,6 +44,7 @@ As part of the detection of equipment, when creating a nse script to detect cert
 | tms-server | a TMS server. |
 | network-device | a device used for networking such as a switch, firewall or VPN gateway. |
 | pos-device | a Point Of Sale device. |
+| quality-assurance | a quality assurance device such as a perminent audio or light meter
 
 Note: Some classifications are for completeness purposes only.  For example, pos-devices, IP-cameras are many and users of these scripts may want to implement their own NSE script for detecting the type of cameras they use.  Other general network switches and devices are not expected to have scripts in this repo but again, users may want to add to the scripts for internal use.
 
