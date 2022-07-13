@@ -1,7 +1,7 @@
 # cinema-nmap-scripts
 This project contains a set of nmap scripts for use in scanning a projection network to discover what equipment is on that projection network and if possible, extract information from the equipment such as Vendor, Product, and version information.
 
-As nmap can be intrusive on a network and generate a lot of scanning traffic or overload a TCP-IP stack on some lightweight cinema equipment, the user is expected to utilise the scripts in a less impactful way.  For example, only ports used in fingerprinting a device should be scanned and not the many thousands as is performed in a general nmap scan.  A SYN scan or lightweight open socket scan that does not actually connect and open ta socket is recommended.
+As nmap can be intrusive on a network and generate a lot of scanning traffic or overload a TCP-IP stack on some lightweight cinema equipment, the user is expected to utilise the scripts in a less impactful way.  For example, only ports used in fingerprinting a device should be scanned and not the many thousands as is performed in a general nmap scan.  A SYN scan or lightweight open socket scan that does not connect and open ta socket is recommended.
 
 ## Precaution
 Cinema networks typically have live sessions in play.  A basic nmap SYN scan and targeting only a smaller number of ports should have very little impact on the equipment, users utilising these scripts should still take precautions.  If this was to cause an issue, it is most likely an automation IP-socket-message from one device to another that may be lost.  This is "extremely" unlikely, however, the users of the scripts should be aware of this.
@@ -24,7 +24,7 @@ The following is the initial set of equipment that scripts will be created for.
 | NEC | Projectors | DONE | Series1 and Series2 projectors, needs testing |
 | INTEG | Automation controller |   | JNIOR 400 |
 | RLY8 | Automation controller |   | generic IP based automation controller |
-| QSC-USL | Sound Processor |   | JSD80, JSD60 |
+| QSC-USL | Sound Processor | DONE | JSD100, JSD60, CM8, IRC-28C, LSS-200 |
 | QSC | Sound Processor |   | Other |
 
 This will be the initial set of target devices.  Vendors and cinema engineers are welcome to submit scripts to this Repo for addition to the scripts.
@@ -44,7 +44,7 @@ As part of the detection of equipment, when creating a nse script to detect cert
 | tms-server | a TMS server. |
 | network-device | a device used for networking such as a switch, firewall or VPN gateway. |
 | pos-device | a Point Of Sale device. |
-| quality-assurance | a quality assurance device such as a perminent audio or light meter
+| quality-assurance | a quality assurance device such as a permanent audio or light meter
 
 Note: Some classifications are for completeness purposes only.  For example, pos-devices, IP-cameras are many and users of these scripts may want to implement their own NSE script for detecting the type of cameras they use.  Other general network switches and devices are not expected to have scripts in this repo but again, users may want to add to the scripts for internal use.
 
