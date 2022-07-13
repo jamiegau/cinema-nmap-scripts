@@ -1,32 +1,72 @@
 # cinema-nmap-scripts
 This project contains a set of nmap scripts for use in scanning a projection network to discover what equipment is on that projection network and if possible, extract information from the equipment such as Vendor, Product, and version information.
 
-As nmap can be intrusive on a network and generate a lot of scanning traffic or overload a TCP-IP stack on some light weight cinema equipment, the user is expected to utilise the scripts in a less impactful way.  For example, only ports used in fingerprinting a device should be scaned and not the many thousands as is performed in a general nmap scan.  A SYN scan or light weight open socket scan that does not actually connect and open ta socket is recommended.
+As nmap can be intrusive on a network and generate a lot of scanning traffic or overload a TCP-IP stack on some lightweight cinema equipment, the user is expected to utilise the scripts in a less impactful way.  For example, only ports used in fingerprinting a device should be scanned and not the many thousands as is performed in a general nmap scan.  A SYN scan or lightweight open socket scan that does not actually connect and open ta socket is recommended.
 
 ## Precaution
-Cinema networks typically have live sessions in play.  A basic nmap SYN scan and targeting only a smaller number of ports should have very little inpact on the equipment, users utilising these scripts should still take precautions.  If this was to cause an issue, it is most likely an automation IP-socket-message from one device to another that may be lost.  This is "extremely" unlikely, however the users of the scripts should be aware of this.
+Cinema networks typically have live sessions in play.  A basic nmap SYN scan and targeting only a smaller number of ports should have very little impact on the equipment, users utilising these scripts should still take precautions.  If this was to cause an issue, it is most likely an automation IP-socket-message from one device to another that may be lost.  This is "extremely" unlikely, however, the users of the scripts should be aware of this.
 
 ## Status
-This should be considered alpha and at an early state of development.
-It would be appriciated if any issues spotted by users be posted to the ISSUES section of the GitHub page for this software.
+This should be considered alpha and at an early stage of development.
+It would be appreciated if any issues spotted by users be posted to the ISSUES section of the GitHub page for this software.
 
 ## Target Equipment
 The following is the initial set of equipment that scripts will be created for.
 
 | Vendor | type | Status | info |
 | --- | --- | --- | --- |
-| Dolby | Player | DONE | IMS1000, IMS2000, IMS3000 (DCP2000 and similar era kit unknwon.) Initial beta version done, needs testing by the community. |
+| Dolby | Player | DONE | IMS1000, IMS2000, IMS3000 (DCP2000 and similar era kit unknown.) Initial beta version done, needs testing by the community. |
 | Dolby | Sound Processor |   | CP750, CP850, CP950 |
 | Barco / Cinionic | Player |   | ICMP |
-| GDC | Player |   | SX2001A, SX3000, SR1000, SX4000 |
+| Barco / Cinionic | Projector | DONE S1,S2 | Barco Series 1&2 ready for testing, S4 different and I would need direct access to one for implementation |
+| GDC | Player | DONE | SX2001A, SX3000, SR1000, SX4000, needs testing |
 | Qube | Player |   | XP-D |
-| NEC | Projectors |   | Series1 and Series2 projectors |
-| INTEG | Automation controler |   | JNIOR 400 |
-| RLY8 | Automation controler |   | generic IP based automation controler |
+| NEC | Projectors | DONE | Series1 and Series2 projectors, needs testing |
+| INTEG | Automation controller |   | JNIOR 400 |
+| RLY8 | Automation controller |   | generic IP based automation controller |
 | QSC-USL | Sound Processor |   | JSD80, JSD60 |
 | QSC | Sound Processor |   | Other |
 
 This will be the initial set of target devices.  Vendors and cinema engineers are welcome to submit scripts to this Repo for addition to the scripts.
+
+## Equipment Classification
+As part of the detection of equipment, when creating a nse script to detect certain equipment, those items discovered will need to be classified into certain buckets for easy correlation into toolchains that may use these scripts.
+
+| Classification | Description |
+| --- | --- |
+| projector | a DCI certified projector. |
+| dci-player | a DCI certified cinema player. |
+| e-player | a electronic media player such as a BluRay player, or device that plays domestic video codecs (MP4, MV1, MOV, etc) |
+| sound-processor | A typical cinema sound processor device including monitor or amplifiers. |
+| automation-io | A device that interfaces automation triggers, IN or OUT. |
+| accessability | A device that is connected with accessability features. |
+| ip-camera | IP-video cameras for audience monitoring or other. |
+| tms-server | a TMS server. |
+| network-device | a device used for networking such as a switch, firewall or VPN gateway. |
+| pos-device | a Point Of Sale device. |
+
+Note: Some classifications are for completeness purposes only.  For example, pos-devices, IP-cameras are many and users of these scripts may want to implement their own NSE script for detecting the type of cameras they use.  Other general network switches and devices are not expected to have scripts in this repo but again, users may want to add to the scripts for internal use.
+
+## Expected results from all devices detected
+To help with programmatically digesting the output from the ```nmap``` scripts typically by using the XML output using the arguments ```-oX```, a number of variables are expected to be present for the output for all scripts.
+
+| Variable Name | Description |
+| --- | --- |
+| classification | The classification of the device detected as defined in the classification table above |
+| vendor | The vendor of the device,  i.e. Dolby, NEC, Barco, INTEG, etc |
+| serialNumber | The serial number of the device if available. |
+| productName | The product name of the device. i.e. NC2000C, JNIOR400, IMS2000 |
+| version | A version string identifying the device to a reasonable level. |
+
+For complex devices that contain numerous version information, please use your judgment of how to best represent the version state of the device.
+
+## Recommended ports to scan
+
+It is recommended to only scan for ports that are used for fingerprinting the known cinema devices in use.  The NSE scripts in the header comments name the ports that should be included in a scan for fingerprinting the devices the script targets.  Otherwise, a list of all ports the script uses is as follows.
+
+```21,22,80,1173,5000,10000,43680,43728,49153,7142,43728```
+
+It is recommended that in the ```nmap``` command, the ```-p``` argument should target the ports listed above.
 
 ## Example
 The following is an example of the initial script created.  This script targets the Dolby Cinema Players,  IMS1000, IMS2000 and is likely to work on DCP2000 and IMS3000 devices
@@ -43,29 +83,33 @@ This will download the latest version of the scripts into a directory called `ci
 
 Make sure you are root, or utilise the *sudo* command as follows.
 ```
-sudo nmap -sS -n --stats-every 5 -p 21,22,80,111,5000,10000 --script cinema-nmap-scripts/cinema-doly-player --script-args 'username=manager,password=password,getcerts=true' 10.0.0.1-200
+sudo nmap -sS -n --stats-every 5 -p 21,22,80,111,5000,10000 --script cinema-nmap-scripts/cinema-dolby-player --script-args 'username=manager,password=password,getcerts=true' 10.0.0.1-200
 ```
 Note, the script args are optional and need to be used if the default login credentials have been changed.
  - The `-sS` option indicates a SYN scan.
  - `-n` will disable DSN resolution/lookup.  Likely not required under this use model.
- - `--stats-every 5` will have updates printed to screen every 5 seconds if the scan is taking a considerable time.
- - `-p 21,22,80,111,5000,10000` indicates to ONLY SCAN the ports listed.  This will stop it scanning many thousands of ports and only scan the ports needed to fingerprint the cinema devices.  If scanning for many different types of devices at the same time, you must name all the ports these scripts need to fingerprint a device.
- - `--script cinema-nmap-scripts/cinema-doly-player` tells the nmap scripting engine what script to run.  You can give it wild cards, for example `cinema-nmap-scripts/cinema-*` would run all scripts availabe in the directory starting the 'cinema-'.
- - `--script-args 'username=manager,password=password,getcerts=true'`  Arguments are option.  In this case you can override the common login cridentials if they have been changed.  You can also ask for it to pull out the public certificates for the device as part of the scan. By default Certs are not included.
+ - `--stats-every 5` will have updates printed to the screen every 5 seconds if the scan is taking a considerable time.
+ - `-p 21,22,80,111,5000,10000` indicates to ONLY SCAN the ports listed.  This will stop it from scanning many thousands of ports and only scan the ports needed to fingerprint the cinema devices.  If scanning for many different types of devices at the same time, you must name all the ports these scripts need to fingerprint the device you wish to detect.
+ - `--script cinema-nmap-scripts/cinema-dolby-player` tells the nmap scripting engine what script to run.  You can give it wild cards, for example, `cinema-nmap-scripts/`cinema-*` would run all scripts availabe in the directory starting the 'cinema-'.
+ - `--script-args 'username=manager,password=password,getcerts=true'`  Arguments are option.  In this case, you can override the common login credentials if they have been changed.  You can also ask for it to pull out the public certificates for the device as part of the scan. By default Certs are not included.
  - `10.0.0.1-200` is the address range to scan.  In this case, subnet 10.0.0.x and all devices on ip address 1 to 200 on that subnet.  You can also list multiple numbers of IP addresses or ranges.
 
 ### Expected output
-NOTE, this is the exoected output.  The CERTIFICATEs are not shown by default and must be turned on as a argument to the script.
+NOTE, this is the expected output.  The CERTIFICATEs are not shown by default and must be turned on as an argument to the script.
+
 ```
 PORT      STATE SERVICE          REASON
 21/tcp    open  ftp              syn-ack ttl 61
 22/tcp    open  ssh              syn-ack ttl 61
 80/tcp    open  http             syn-ack ttl 61
 | cinema-dolby-player:
-|   hostname: Marloo-c2-IMS2000-broken
-|   screenName: Marloo-C2
+|   classification: dci-player
+|   vendor: Dolby
 |   productName: NP-90MS02
 |   serialNumber: 340406
+|   version: 2.8.2-0, 4.6.1-0
+|   hostname: Marloo-c2-IMS2000-broken
+|   screenName: Marloo-C2
 |   mainSoftwareVersion: 2.8.30-0
 |   mainFirmwareVersion: 4.6.10-0
 |   SoftwareInfo:
@@ -133,40 +177,6 @@ PORT      STATE SERVICE          REASON
 |       type: AddOnBoard
 |   CertInfo:
 |
-|       chain: -----BEGIN CERTIFICATE-----
-| MIIEpDCCA4ygAwIBAgIIAVMbYJsGvpkwDQYJKoZIhvcNAQELBQAwgYsxITAfBgNV
-| BAoTGERDMi5TTVBURS5ET1JFTUlMQUJTLkNPTTEaMBgGA1UECxMRREMuRE9SRU1J
-| TEFCUy5DT00xIzAhBgNVBAMTGi5VUzEuRENTLkRPTFBISU4uREMyLlNNUFRFMSUw
-| IwYDVQQuExxCbkIwaURKTGd5cWlXVWpuMXVxck95Mi9ERUU9MB4XDTA3MDEwMTAw
-| MDAwMFoXDTI1MTIwMTAwMDAwMFowgaAxITAfBgNVBAoTGERDMi5TTVBURS5ET1JF
-| TUlMQUJTLkNPTTEaMBgGA1UECxMRREMuRE9SRU1JTEFCUy5DT00xODA2BgNVBAMT
-| L0xFIFNQQiBNRCBGTSBTTS5JTVMtMzQwNDA2LkRDLkRPTFBISU4uREMyLlNNUFRF
-| MSUwIwYDVQQuExxmYWVOb0NXNXhxZGpvSnd3NW9oYktGakVoWEE9MIIBIjANBgkq
-| hkiG9w0BAQEFAAOCAQ8AMIIBCgKCAQEA4CvSWvnp7DU+EkpHrbkmRxOERy0ZK8Qv
-| Y/90yX6X9eWBoYui8tPEmiN4MO4bfvqK2n3OwoSctslY6sxEnWu4A1dxjGxiQwI4
-| RgBYWMsObC70TkkR5ncrqEvA9ygiswK5S9olVO4mG5A1HapjflVPcAipnyKgY+Zs
-| bBL68IyZGwCJaMKxuynyhspU/i5XsJ9bMIUNYKVxaOZPR1Mn0NUxrCT+TzBN6TPa
-| GVOw+6CBK9N4AG4H8XTmMkDRwmsPljTLiEomobQhIsHsMsVB0BDgJJvrF1kSXNRh
-| M/uC0dZWljKLHzQEp87vqOXbksWwnhKdFoym1NMbG73V0ELjYz4G0QIDAQABo4H0
-| MIHxMAwGA1UdEwEB/wQCMAAwCwYDVR0PBAQDAgQwMB0GA1UdDgQWBBR9p42gJbnG
-| p2OgnDDmiFsoWMSFcDCBtAYDVR0jBIGsMIGpgBQGcHSIMkuDKqJZSOfW6qs7Lb8M
-| QaGBjaSBijCBhzEhMB8GA1UEChMYREMyLlNNUFRFLkRPUkVNSUxBQlMuQ09NMRow
-| GAYDVQQLExFEQy5ET1JFTUlMQUJTLkNPTTEfMB0GA1UEAxMWLkRDUy5ET0xQSElO
-| LkRDMi5TTVBURTElMCMGA1UELhMcaE43dVhTTFlpL0VLdFQwTVlhRFdlRTVqM01v
-| PYIBAjANBgkqhkiG9w0BAQsFAAOCAQEAORKoaHo0fOEupEvn1FYkCulPL3lUIZt9
-| GawKBVD+TATcTMakH3n9J6YpYiOHY1dB3SRJEh5XHwB/C21ayEpuaZP0AXA4kB6x
-| 8krO/t1SUmW4N/h9+uqqleCoNVWaLiKnrHgbM6mejzZOCF2cQFu3Phb+S/0pjHsr
-| dOILXzWAifz6IvuZlgv6bUAHAE5V6Lec1DXWkcshXYPABUjMkisff6sARHLKNR0w
-| f+gZbwZdw3+2eqRMR/yElcxnvVEPlwu6kpXo7K/M7Pew6XQIExqHxSDjmvooHPIf
-| kcpXmjgKACZB1r9IADHpOetROoRUhMj5v7r0D8KGp/xsQHefBCMBvQ==
-| -----END CERTIFICATE-----
-| -----BEGIN CERTIFICATE-----
-| MIIEhzCCA2+gAwIBAgIBAjANBgkqhkiG9w0BAQsFADCBhzEhMB8GA1UEChMYREMy
-| LlNNUFRFLkRPUkVNSUxBQlMuQ09NMRowGAYDVQQLExFEQy5ET1JFTUlMQUJTLkNP
-| TTEfMB0GA1UEAxMWLkRDUy5ET0xQSElOLkRDMi5TTVBURTElMCMGA1UELhMcaE43
-| dVhTTFlpL0VLdFQwTVlhRFdlRTVqM01vPTAeFw0wNzAxMDEwMDAwMDBaFw0yNTEy
-| MzEyMzU5NTlaMIGLMSEwHwYDVQQKExhEQzIuU01QVEUuRE9SRU1JTEFCUy5DT00x
-| GjAYBgNVBAsTEURDLkRPUkV
 |       title: jp2k smpte
 |       cert: -----BEGIN CERTIFICATE-----
 | MIIEpDCCA4ygAwIBAgIIAVMbYJsGvpkwDQYJKoZIhvcNAQELBQAwgYsxITAfBgNV
@@ -196,40 +206,6 @@ PORT      STATE SERVICE          REASON
 | kcpXmjgKACZB1r9IADHpOetROoRUhMj5v7r0D8KGp/xsQHefBCMBvQ==
 | -----END CERTIFICATE-----
 |
-|       chain: -----BEGIN CERTIFICATE-----
-| MIIEmTCCA4GgAwIBAgIIAVMbYAbH+cMwDQYJKoZIhvcNAQELBQAwgYsxITAfBgNV
-| BAoTGERDMi5TTVBURS5ET1JFTUlMQUJTLkNPTTEaMBgGA1UECxMRREMuRE9SRU1J
-| TEFCUy5DT00xIzAhBgNVBAMTGi5VUzEuU01TLkRPTFBISU4uREMyLlNNUFRFMSUw
-| IwYDVQQuExxjb2QrQncvUUJsb1BzZkgxSGtnZXlkRDlsUE09MB4XDTA3MDEwMTAw
-| MDAwMFoXDTI1MTIwMTAwMDAwMFowgZUxITAfBgNVBAoTGERDMi5TTVBURS5ET1JF
-| TUlMQUJTLkNPTTEaMBgGA1UECxMRREMuRE9SRU1JTEFCUy5DT00xLTArBgNVBAMT
-| JFNNUy5JTVMtMzQwNDA2LlNNUy5ET0xQSElOLkRDMi5TTVBURTElMCMGA1UELhMc
-| U09aZ1Z6YjZWenJKS2w2QWRnN0ZMdlQ4Rk40PTCCASIwDQYJKoZIhvcNAQEBBQAD
-| ggEPADCCAQoCggEBAMNWoSDD619TCJgglB7ehBQcdGavvkUEDuC2ueJhQ0AgbzYZ
-| vK8MCUx/hva4Tfjh1yIevIDfin94J8CPhS9M3K0uZIrmYvgY97zyeKa7szUF5JsE
-| M25Gl3IoKTIgvc+kMT2QvDSRuF3dHr9p8gI6xfnaRCLBSOOUNfS3yxjfB2tDkysd
-| vI+R3fZaavCrLSYspsBi2sQyKwGLAP0uqomTtqMTXfPp4RImYbptxnPjP7eFbhv6
-| 9LxIedXmp7/5zCsz0vz7oiqV2+PNPMEuSWKVyqZ/pDiT6GZuFhErq6zMUD2wmBqu
-| MAe1LH9H56t8fBJbPicWeXysXK8I9bVIt92i4+ECAwEAAaOB9DCB8TAMBgNVHRMB
-| Af8EAjAAMAsGA1UdDwQEAwIEsDAdBgNVHQ4EFgQUSOZgVzb6VzrJKl6Adg7FLvT8
-| FN4wgbQGA1UdIwSBrDCBqYAUcod+Bw/QBloPsfH1HkgeydD9lPOhgY2kgYowgYcx
-| ITAfBgNVBAoTGERDMi5TTVBURS5ET1JFTUlMQUJTLkNPTTEaMBgGA1UECxMRREMu
-| RE9SRU1JTEFCUy5DT00xHzAdBgNVBAMTFi5TTVMuRE9MUEhJTi5EQzIuU01QVEUx
-| JTAjBgNVBC4THGdCYW9OTEI5MEdmNEFHaFNDM2xVeFllMUN3Zz2CAQIwDQYJKoZI
-| hvcNAQELBQADggEBAEtkgEXfDrTYMlJ+Ogw03WHG/5WdhHDrBXDgCdeQ2HwNK/i6
-| f5WQjTPkD0cEMMwySe75AODPgFKfBv0NRij6Id1h/LWcm0H4sxGZczxynvxY4Omw
-| 89FD/c25Z7n8eneAmVj+fRnzbpcAinkrktGSNbutIJ2qPskSiXq0AFxWfoinEXP+
-| ekUr6dTyTmAjT2a2ye4CUXnLrw3or/FNjtysascWfxEkinP0uNnEu6ZWQTRp+peh
-| 2HMdzDmYeCixuV2fkfRPze0o7qnIIQWAZ6Ge6jWZxGC+zVarSgW4B4jrGqfeXcAR
-| +8KD1ucn9dBYWONLq+9kBxtvWURY9mM+r4B8jNw=
-| -----END CERTIFICATE-----
-| -----BEGIN CERTIFICATE-----
-| MIIEhzCCA2+gAwIBAgIBAjANBgkqhkiG9w0BAQsFADCBhzEhMB8GA1UEChMYREMy
-| LlNNUFRFLkRPUkVNSUxBQlMuQ09NMRowGAYDVQQLExFEQy5ET1JFTUlMQUJTLkNP
-| TTEfMB0GA1UEAxMWLlNNUy5ET0xQSElOLkRDMi5TTVBURTElMCMGA1UELhMcZ0Jh
-| b05MQjkwR2Y0QUdoU0MzbFV4WWUxQ3dnPTAeFw0wNzAxMDEwMDAwMDBaFw0yNTEy
-| MzEyMzU5NTlaMIGLMSEwHwYDVQQKExhEQzIuU01QVEUuRE9SRU1JTEFCUy5DT00x
-| GjAYBgNVBAsTEURDLkRPUkVNSUxBQlMuQ09NMSM
 |       title: sms
 |       cert: -----BEGIN CERTIFICATE-----
 | MIIEmTCCA4GgAwIBAgIIAVMbYAbH+cMwDQYJKoZIhvcNAQELBQAwgYsxITAfBgNV

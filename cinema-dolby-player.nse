@@ -1,17 +1,20 @@
 local nmap = require "nmap"
 local stdnse = require "stdnse"
 local http = require "http"
-local slaxml = require "slaxml"
 
 description = [[
 Detects socket fingerprint of Dolby or Doremi DCI cinema players and flags if found.
 Will attempt to pull out software and firmware version of system
+
+Sockets required for scan, 21,22,80,5000,10000
+
+Tool uses SNMP, OID for query data
 ]]
 
 --------------------------------------------------------------------
 ---
 -- @usage
--- nmap --script=cinema-dolby-player <target>
+-- nmap -p21,22,80,5000,10000 --script=cinema-dolby-player --script-args 'username=manager,password=password,getcerts=true' <target>
 -- @output
 -- PORT    STATE SERVICE
 -- to be create
@@ -199,7 +202,9 @@ local function soap_GetCertificateList_query(host, port, sessionId)
 		CertInfoTable[counter] = {}
 		CertInfoTable[counter]['title'] = all_trim(string.match(match_txt, '<sys:title>(.-)</sys:title>'))
 		CertInfoTable[counter]['cert'] = all_trim(string.match(match_txt, '<sys:cert>(.-)</sys:cert>'))
-		CertInfoTable[counter]['chain'] = all_trim(string.match(match_txt, '<sys:chain>(.-)</sys:chain>'))
+		-- Dropped adding the chain data as there appears to be a bug in that the full
+		-- chain TEXT is nto returned byt the SOAP command.  Plus it is rearly used
+		-- CertInfoTable[counter]['chain'] = all_trim(string.match(match_txt, '<sys:chain>(.-)</sys:chain>'))
 		counter = counter + 1
 	end
 
@@ -275,11 +280,17 @@ action = function(host, port)
 	end
 
 	local output = stdnse.output_table()
+	-- required variables are
+	--- classification, vendor, productName, serialNumber, softwareVersion
+	output.classification = 'dci-player'
+	output.vendor = 'Dolby'
+	output.productName = ProdInfoTable['productName']
+	output.serialNumber = ProdInfoTable['serialNumber']
+	output.version = ProdInfoTable['mainSoftwareVersion'] .. ', ' .. ProdInfoTable['mainFirmwareVersion']
+
 	output.hostname = HostnameTable['hostname']
 	output.screenName = HostnameTable['screenName']
 
-	output.productName = ProdInfoTable['productName']
-	output.serialNumber = ProdInfoTable['serialNumber']
 	output.mainSoftwareVersion = ProdInfoTable['mainSoftwareVersion']
 	output.mainFirmwareVersion = ProdInfoTable['mainFirmwareVersion']
 
