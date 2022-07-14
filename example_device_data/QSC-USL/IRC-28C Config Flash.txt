@@ -1,0 +1,87 @@
+
+
+James,
+
+Attached is the latest firmware for the IRC-28C.
+
+
+Below is config source from my IRC-28C at
+http://192.168.0.123/debug/ConfigFlash.html .
+
+Note that ConfigFlash.html moved to within the debug directory.
+
+I'll dig up an LSS-200 next.
+
+Harold
+
+
+
+<!DOCTYPE html>
+<html>
+  <head>
+    <meta charset="utf-8">
+	<link rel="stylesheet" type="text/css" href="/style.css">
+	<link rel="shortcut icon" href="/favicon.ico" />
+    <title>QSC - Screen 34 ConfigFlash</title>
+  </head>
+  <body>
+    <span id="model"><br />&nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp;
+&nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; USL Caption Encoder
+v210806<br />&nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp;
+&nbsp; &nbsp; &copy; 2017, <a href="https://www.qsc.com/cinema/usl/"
+style="color:red">QSC LLC</a> </span>
+    <h1 aign="center">QSC - Screen 34 ConfigFlash</h1>
+<pre>
+
+
+
+
+irc.sys.auditorium	34
+irc.sys.comments	This is a comment!
+irc.sys.dhcp	0
+irc.sys.host	HH Captions
+irc.sys.dns1	8.8.8.8
+irc.sys.dns2	4.4.4.4
+irc.sys.gateway	192.168.0.1
+irc.sys.ip	192.168.0.123
+irc.sys.ir_enable	1
+irc.sys.mac	0	0	0	0	0	0
+irc.sys.mask	255.255.255.240
+irc.sys.ntp_ip	time.nist.gov
+irc.sys.num_languages	4
+irc.sys.dcs_ip	10.108.129.22
+irc.sys.theater_name	QSC
+irc.sys.theater_number	12
+irc.sys.timeline_offset	0
+irc.sys.language_priority	0	50	40	48	42	40
+irc.sys.language_priority	1	103	115	102	105	106
+irc.sys.language_priority	2	57	55	58	56	59
+irc.sys.language_priority	3	79	79	79	79	79
+irc.sys.rs232_use	0
+irc.sys.offline_text_enable_seconds	15
+irc.sys.offline_text	0	The quick brown fox
+irc.sys.offline_text	1	Jumped over the
+irc.sys.offline_text	2	Lazy dog's back.
+irc.sys.livetimeout	5
+
+</pre>
+  </body>
+</html>
+
+
+
+
+
+-- 
+FCC Rules Updated Daily at http://www.hallikainen.com
+Not sent from an iPhone.
+
+
+-- 
+FCC Rules Updated Daily at http://www.hallikainen.com
+Not sent from an iPhone.
+
+
+-- 
+FCC Rules Updated Daily at http://www.hallikainen.com
+Not sent from an iPhone.

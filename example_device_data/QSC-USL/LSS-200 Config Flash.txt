@@ -1,0 +1,275 @@
+
+
+James,
+
+Here's the source for http://192.168.0.123/ConfigFlash.html
+
+
+<!DOCTYPE html>
+<html>
+  <head>
+    <meta charset="utf-8">
+	<link rel="stylesheet" type="text/css" href="/style.css">
+	<link rel="shortcut icon" href="/favicon.ico" />
+    <title>LSS-200 Test 4 - Screen 4 ConfigFlash</title>
+  </head>
+  <body>
+    <span id="model"><br />&nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp;
+&nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; USL LSS-200<br />&nbsp;
+&nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &copy;
+2020, <a href="https://www.qsc.com/cinema/usl/" style="color:red">QSC
+LLC</a> </span>
+    <h1 aign="center">LSS-200 Test 4 - Screen 4 ConfigFlash</h1>
+<pre>
+
+
+
+
+lss.sys.auditorium	4
+lss.sys.comments	DCP Script Testing
+lss.sys.gateway	192	168	0	1
+lss.sys.ip	192	168	0	123
+lss.sys.dns1	8	8	8	8
+lss.sys.dns2	4	4	4	4
+lss.sys.ntp_ip	time.nist.gov
+lss.sys.mask	255	255	255	0
+lss.sys.mac	0x00	0x00	0x00	0x00	0x00	0x00
+lss.sys.host	LSS-200
+lss.sys.snmp.description	LSS Light and Sound Sensor
+lss.sys.snmp.location	1675 MacArthur Blvd., Costa Mesa, CA 92626 USA
+lss.sys.snmp.name	LSS Light and Sound Sensor
+lss.sys.snmp.contact	CinemaTechSupport@qsc.com
+lss.sys.snmp.location	1675 MacArthur Blvd., Costa Mesa, CA 92626 USA
+lss.sys.serialnumber	A0518006H
+lss.sys.org_key	QSC
+lss.sys.theater_name	LSS-200 Test 4
+lss.sys.theater_number	1
+lss.sys.display_flags	65535
+lss.sys.color_correlation_matrix	0.019264	-0.003638	-0.000579	-0.003882	0.018947	0.000259	-0.001463	0.000375	0.017791
+lss.sys.photopic_scale_to_cdm2	0.015539
+lss.sys.photopic_dark_count	16
+lss.sys.luminance_scale	1.000000
+lss.cal.ir_ref_count	0
+lss.sys.ir_dark_count	0
+lss.cal.xyz_dark_count	15	16	25
+lss.sys.spl_cal_factor	120.200764
+lss.sys.spl_max_limit	100.000000
+ltable	0
+ltable	1	LIVE
+ltable	2	Light 2
+ltable	3	Light 3
+ltable	4	Light 4
+ltable	5	Light 5
+ltable	6	Light 6
+ltable	7	Light 7
+ltable	8	Luminance
+ltable	9
+ltable	10	0.4fL
+ltable	11	0.4fL
+ltable	12	0.4fL
+ltable	13	0.4fL
+ltable	14	0.4fL
+ltable	15	0.4fL
+ltable	16	x
+ltable	17
+ltable	18	0.304
+ltable	19	0.299
+ltable	20	0.299
+ltable	21	0.299
+ltable	22	0.306
+ltable	23	0.309
+ltable	24	y
+ltable	25
+ltable	26	0.466
+ltable	27	0.450
+ltable	28	0.450
+ltable	29	0.450
+ltable	30	0.452
+ltable	31	0.463
+ltable	32	CCT
+ltable	33
+ltable	34	6242K
+ltable	35	6422K
+ltable	36	6422K
+ltable	37	6422K
+ltable	38	6234K
+ltable	39	6112K
+ltable	40	Temperature
+ltable	41
+ltable	42	33.6 C
+ltable	43	33.6 C
+ltable	44	33.6 C
+ltable	45	33.6 C
+ltable	46	33.6 C
+ltable	47	33.6 C
+ltable	48	u'
+ltable	49
+ltable	50	0.152
+ltable	51	0.153
+ltable	52	0.153
+ltable	53	0.153
+ltable	54	0.157
+ltable	55	0.156
+ltable	56	v'
+ltable	57
+ltable	58	0.525
+ltable	59	0.519
+ltable	60	0.519
+ltable	61	0.519
+ltable	62	0.521
+ltable	63	0.525
+DisplayDataSource	0	0
+DisplayDataSource	1	3
+DisplayDataSource	2	5
+DisplayDataSource	3	6
+DisplayDataSource	4	10
+DisplayDataSource	5	1
+DisplayDataSource	6	11
+DisplayDataSource	7	12
+DisplayDataSource	8	0
+DisplayDataSource	9	0
+DisplayDataSource	10	0
+DisplayDataSource	11	0
+DisplayDataSource	12	0
+DisplayDataSource	13	0
+DisplayDataSource	14	0
+DisplayDataSource	15	0
+stable	0
+stable	1	LIVE
+stable	2	SPL2
+stable	3	SPL 3
+stable	4	SPL 4
+stable	5	SPL 5
+stable	6	S{L 6
+stable	7	SPL 7
+stable	8	SPL 8
+stable	9	SPL 9
+stable	10	S{L 10
+stable	11	SPL 11
+stable	12	SPL 12
+stable	13	SPL 13
+stable	14	SPL 14
+stable	15
+stable	16	SPL
+stable	17
+stable	18	55.1dBc
+stable	19	55.0dBc
+stable	20	54.3dBc
+stable	21	53.6dBc
+stable	22	53.5dBc
+stable	23	53.2dBc
+stable	24	53.2dBc
+stable	25	53.2dBc
+stable	26	53.0dBc
+stable	27	52.0dBc
+stable	28	50.6dBc
+stable	29	49.3dBc
+stable	30	50.5dBc
+stable	31
+lss.sys.meters_to_screen	5.7
+lss.sys.display_length_in_meters	0
+lss.sys.error_report_days	3
+lss.sys.script_start_white	10468
+lss.sys.admin_hash	160092741
+
+</pre>
+   <script src="/translate/translate.js" type="text/javascript"></script>
+  </body>
+</html>
+
+
+Harold
+
+
+On Wed, July 13, 2022 11:18 am, Harold Hallikainen wrote:
+> James,
+>
+> Attached is the latest firmware for the IRC-28C.
+>
+>
+> Below is config source from my IRC-28C at
+> http://192.168.0.123/debug/ConfigFlash.html .
+>
+> Note that ConfigFlash.html moved to within the debug directory.
+>
+> I'll dig up an LSS-200 next.
+>
+> Harold
+>
+>
+>
+> <!DOCTYPE html>
+> <html>
+>   <head>
+>     <meta charset="utf-8">
+> 	<link rel="stylesheet" type="text/css" href="/style.css">
+> 	<link rel="shortcut icon" href="/favicon.ico" />
+>     <title>QSC - Screen 34 ConfigFlash</title>
+>   </head>
+>   <body>
+>     <span id="model"><br />&nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp;
+> &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; USL Caption Encoder
+> v210806<br />&nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp; &nbsp;
+&nbsp; &nbsp; &copy; 2017, <a href="https://www.qsc.com/cinema/usl/"
+style="color:red">QSC LLC</a> </span>
+>     <h1 aign="center">QSC - Screen 34 ConfigFlash</h1>
+> <pre>
+>
+>
+>
+>
+> irc.sys.auditorium	34
+> irc.sys.comments	This is a comment!
+> irc.sys.dhcp	0
+> irc.sys.host	HH Captions
+> irc.sys.dns1	8.8.8.8
+> irc.sys.dns2	4.4.4.4
+> irc.sys.gateway	192.168.0.1
+> irc.sys.ip	192.168.0.123
+> irc.sys.ir_enable	1
+> irc.sys.mac	0	0	0	0	0	0
+> irc.sys.mask	255.255.255.240
+> irc.sys.ntp_ip	time.nist.gov
+> irc.sys.num_languages	4
+> irc.sys.dcs_ip	10.108.129.22
+> irc.sys.theater_name	QSC
+> irc.sys.theater_number	12
+> irc.sys.timeline_offset	0
+> irc.sys.language_priority	0	50	40	48	42	40
+> irc.sys.language_priority	1	103	115	102	105	106
+> irc.sys.language_priority	2	57	55	58	56	59
+> irc.sys.language_priority	3	79	79	79	79	79
+> irc.sys.rs232_use	0
+> irc.sys.offline_text_enable_seconds	15
+> irc.sys.offline_text	0	The quick brown fox
+> irc.sys.offline_text	1	Jumped over the
+> irc.sys.offline_text	2	Lazy dog's back.
+> irc.sys.livetimeout	5
+>
+> </pre>
+>   </body>
+> </html>
+>
+>
+>
+>
+>
+> --
+> FCC Rules Updated Daily at http://www.hallikainen.com
+> Not sent from an iPhone.
+>
+>
+> --
+> FCC Rules Updated Daily at http://www.hallikainen.com
+> Not sent from an iPhone.
+
+
+-- 
+FCC Rules Updated Daily at http://www.hallikainen.com
+Not sent from an iPhone.
+
+
+
+-- 
+FCC Rules Updated Daily at http://www.hallikainen.com
+Not sent from an iPhone.
