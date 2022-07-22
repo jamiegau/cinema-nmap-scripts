@@ -11,10 +11,20 @@ Will attempt to pull out software and firmware version of system
 --------------------------------------------------------------------
 ---
 -- @usage
--- nmap -sS -p 21,22,80,9200 --script=cinema-integ-jnior <target>
+-- nmap -sS -p 21,22,80,9200 --script=cinema-integ-jnior --script-args 'username=jnior,password=jnior' <target>
 -- @output
--- PORT    STATE SERVICE
--- to be create
+-- PORT     STATE    SERVICE
+-- 21/tcp   open     ftp
+-- 22/tcp   filtered ssh
+-- 80/tcp   open     http
+-- | cinema-integ-jnior:
+-- |   classification: automation-io
+-- |   vendor: Integ
+-- |   productName: jr410
+-- |   serialNumber: 616090227
+-- |   version: v1.5.0
+-- |_  hostname: jr616090227
+-- 9200/tcp open     wap-wsp
 
 author = "James Gardiner"
 license = "Same as Nmap--See https://nmap.org/book/man-legal.html"
@@ -268,12 +278,12 @@ function TableConcat(t1, t2)
 end
 
 local function jnior_request_login(host, username, password)
-	print("jnior_request_login " .. host.ip, username, password)
+	stdnse.debug("jnior_request_login " .. host.ip, username, password)
 	local result, socket, try, catch
 
 	-- local login_string = "\x01\x00\x0d\x60\xb7\x7e\x05" .. username .. "\x05" .. password
 	local login_string = "\x7e\x05" .. username .. "\x05" .. password
-	print('login_string = ' .. PrintHex(login_string))
+	stdnse.debug('login_string = ' .. PrintHex(login_string))
 	local jnior_len = string.len(login_string)
 	-- stdnse.debug('jnior_len: ' .. jnior_len)
 	-- stdnse.debug('jnior_len: ' .. string.format("%02x", jnior_len) .. ', len: ' .. string.len(string.format("%x", jnior_len)))
@@ -355,8 +365,10 @@ local function jnior_request_login(host, username, password)
 	end
 	local serial = string.sub(result2, 12, -1) -- to end of string..
 	-------------------------------------------------------------------------------------------------
-	-- version variable fetch
-	-- "\x01 \x00\x13 \xbe\x61 \x0b\x00\x01\x00\xde\x0d \x24\x53\x65\x72\x69\x61\x6c\x4e\x75\x6d\x62\x65\x72"
+	-- Hostname variable fetch
+	--
+	-- cmd len crc requestRegVar len DevicePath
+	-- "\x01 \x00\x13 \xbe\x61 \x0b\x00\x01\x00\xde \x0d \x24\x53\x65\x72\x69\x61\x6c\x4e\x75\x6d\x62\x65\x72"
 	local hostname_cmd = '\x0b\x00\x01\x00\xde\x11IpConfig/Hostname'
 	-- local hostname_cmd = '\x0b\x00\x01\x00\xde\x0bDevice/Desc'
 
@@ -415,14 +427,6 @@ action = function(host, port)
 	output.serialNumber = serial
 	output.version = version
 	output.hostname = hostname
-
-	local testvar = "\x01" ..
-		"\x00\x2c" ..
-		"\x2c\x04" ..
-		"\x0f\x00\x03\x00\x00\x0b\x44\x65\x76\x69\x63\x65" ..
-		"\x2f\x44\x65\x73\x63\x00\x01\x08\x24\x56\x65\x72\x73\x69\x6f\x6e\x00" ..
-		"\x02\x0d\x24\x53\x65\x72\x69\x61\x6c\x4e\x75\x6d\x62\x65\x72"
-	stdnse.debug("testvar: " .. PrintHex(testvar))
 
 	return output
 end

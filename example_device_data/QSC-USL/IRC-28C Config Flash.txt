@@ -5,7 +5,7 @@ James,
 Attached is the latest firmware for the IRC-28C.
 
 
-Below is config source from my IRC-28C at
+Below is the config source from my IRC-28C at
 http://192.168.0.123/debug/ConfigFlash.html .
 
 Note that ConfigFlash.html moved to within the debug directory.

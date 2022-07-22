@@ -1,6 +1,7 @@
 local nmap = require "nmap"
 local stdnse = require "stdnse"
 local http = require "http"
+local nsedebug = require "nsedebug"
 
 description = [[
 Detects socket fingerprint of QSC-USL cinema devices and flags if found.
@@ -10,10 +11,30 @@ Will attempt to pull out software and firmware version of system
 --------------------------------------------------------------------
 ---
 -- @usage
--- nmap --script=cinema-qsc-usl-devices <target>
+-- nmap -sS -p21,22,80,10001 --script=cinema-qsc-usl-devices <target>
 -- @output
--- PORT    STATE SERVICE
--- to be create
+-- PORT      STATE    SERVICE
+-- 21/tcp    filtered ftp
+-- 22/tcp    filtered ssh
+-- 80/tcp    open     http
+-- | cinema-qsc-usl-devices:
+-- |   classification: sound-processor
+-- |   vendor: QSC-USL
+-- |   productName: JSD-60
+-- |   serialNumber: 3458
+-- |   version: E,141205,141218,141014
+-- |   PCBversion: E
+-- |   bootloaderVersion: 141205
+-- |   picVersion: 141218
+-- |   dspVersion: 141014
+-- |   hostname: JSD60-FORBES-C1
+-- |   theaterName: Forbes Services Club
+-- |   theaterNumber: 1
+-- |   dcs: IMS2000
+-- |   automation: JNIOR
+-- |   comments:
+-- |_  projector: NC1100L-A
+-- 10001/tcp open     scp-config
 
 author = "James Gardiner"
 license = "Same as Nmap--See https://nmap.org/book/man-legal.html"
@@ -95,10 +116,19 @@ local function split(str, sep)
 	return result
 end
 
-function getHttpUrl(host, urlPath)
+local function getHttpUrl(host, urlPath)
 	local http_port = { number = 80, protocol = 'tcp' }
 	local get_res = http.get(host, http_port, urlPath)
-	return get_res.body
+	-- stdnse.debug("http GET = " .. nsedebug.tostr(get_res))
+
+	local res, body
+	if get_res.status == 404 then
+		res = false
+	else
+		res = true
+		body = get_res.body
+	end
+	return res, body
 end
 
 -- Now lets try and query the player for some useful information
@@ -119,35 +149,73 @@ action = function(host, port)
 	local comments = nil
 	local projector = nil
 
+	local lineOneTable, lineTwoTable
+
 	local output = stdnse.output_table()
 	--
 	-- Fetch the http://host/ConfigFlash.html
-	local configFlash_body = getHttpUrl(host, '/ConfigFlash.html')
-	-- stdnse.pretty_printer(configFlash_body)
-	local configFlash = string.match(configFlash_body, '<pre>(.-)</pre>')
-	configFlash = all_trim(configFlash)
-	configFlash = configFlash:gsub("\x0D", "")
-	local configFlash_table = split(configFlash, "\n")
-	-- stdnse.pretty_printer(configFlash_table)
-	local lineOneTable = split(configFlash_table[1], ' ')
-	local lineTwoTable = split(configFlash_table[2], ' ')
-	-- print('--------------------- lineOneTable -----------------')
-	-- stdnse.pretty_printer(lineOneTable)
-	if lineOneTable[3] == "JSD-60" or
-		lineOneTable[3] == "JSD-100" or
-		lineOneTable[3] == "CM-8E" then
-		classification = 'sound-processor'
-		productName = lineOneTable[3]
-	elseif lineOneTable[3] == "LSS-200" then
-		classification = 'quality-assurance'
-		productName = lineOneTable[3]
-		serialNumber = 'to implement'
-		version = 'to implement'
-	elseif lineOneTable[3] == "IRC-28C" then
-		classification = 'accessability'
-		productName = lineOneTable[3]
-		serialNumber = 'to implement'
-		version = 'to implement'
+	local get_status, configFlash_body
+	local get_status2, configFlash_body2
+	local get_status3, page_body3
+
+	get_status, configFlash_body = getHttpUrl(host, '/ConfigFlash.html')
+	stdnse.debug("get_status = " .. nsedebug.tostr(get_status))
+	if get_status == false then
+		get_status2, configFlash_body = getHttpUrl(host, '/debug/ConfigFlash.html')
+		stdnse.debug("get_status2 = " .. nsedebug.tostr(get_status2))
+		if get_status2 == false then
+			--
+			-- could be an old IRC-28C with older firmware that does not suppore ConfigFlash.html
+			get_status3, page_body3 = getHttpUrl(host, '/')
+			stdnse.debug("get_status3 = " .. nsedebug.tostr(get_status3))
+			if get_status3 == true then
+				-- loks lke a IRC-28C
+				local page_title = all_trim(string.match(page_body3, '<title>(.-)</title>'))
+				if page_title == "USL Caption Encoder" then
+					-- special case, a older firmware IRC-28C
+					stdnse.debug("special case, a older firmware IRC-28C")
+					local h1 = all_trim(string.match(page_body3, '<h1>(.-)</h1>'))
+					productName = "IRC-28C"
+					version = split(h1, " ")[4]
+					classification = 'accessability'
+				end
+			else
+				return false
+			end
+		end
+	end
+
+	if configFlash_body ~= nil then
+		-- stdnse.pretty_printer(configFlash_body)
+		local configFlash = string.match(configFlash_body, '<pre>(.-)</pre>')
+		configFlash = all_trim(configFlash)
+		configFlash = configFlash:gsub("\x0D", "")
+		-- before we plit into lines, check if its a IRC by looking for 'irc.sys.ip'
+		local irc_start, irc_end = string.find(configFlash, 'irc.sys.ip')
+		if irc_start ~= nil then
+			productName = "IRC-28C"
+		end
+		--
+		local configFlash_table = split(configFlash, "\n")
+		-- stdnse.pretty_printer(configFlash_table)
+		lineOneTable = split(configFlash_table[1], ' ')
+		lineTwoTable = split(configFlash_table[2], ' ')
+		-- print('--------------------- lineOneTable -----------------')
+		-- stdnse.pretty_printer(lineOneTable)
+		if lineOneTable[3] == "JSD-60" or
+			lineOneTable[3] == "JSD-100" or
+			lineOneTable[3] == "CM-8E" then
+			classification = 'sound-processor'
+			productName = lineOneTable[3]
+		elseif lineOneTable[3] == "LSS-200" then
+			classification = 'quality-assurance'
+			productName = lineOneTable[3]
+			serialNumber = 'to implement'
+			version = 'to implement'
+		elseif productName == "IRC-28C" then
+			-- productName = "IRC-28C"
+			classification = 'accessability'
+		end
 	end
 
 
@@ -156,7 +224,6 @@ action = function(host, port)
 		serialNumber = all_trim(socket_command(host, 'jsd60.sys.serial_number\r\n'))
 		theaterName = socket_command(host, 'jsd60.sys.theater_name\r\n')
 		theaterNumber = socket_command(host, 'jsd60.sys.theater_number\r\n')
-		theaterName = socket_command(host, 'jsd60.sys.theater_name\r\n')
 		dcs = socket_command(host, 'jsd60.sys.dcs\r\n')
 		automation = socket_command(host, 'jsd60.sys.automation\r\n')
 		comments = socket_command(host, 'jsd60.sys.comments\r\n')
@@ -175,7 +242,6 @@ action = function(host, port)
 		serialNumber = all_trim(socket_command(host, 'jsd100.sys.serial_number\r\n'))
 		theaterName = socket_command(host, 'jsd100.sys.theater_name\r\n')
 		theaterNumber = socket_command(host, 'jsd100.sys.theater_number\r\n')
-		theaterName = socket_command(host, 'jsd100.sys.theater_name\r\n')
 		dcs = socket_command(host, 'jsd100.sys.dcs\r\n')
 		automation = socket_command(host, 'jsd100.sys.automation\r\n')
 		comments = socket_command(host, 'jsd100.sys.comments\r\n')
@@ -200,6 +266,13 @@ action = function(host, port)
 		projector = socket_command(host, 'cm8.sys.projector\r\n')
 		hostname = socket_command(host, 'cm8.sys.host\r\n')
 		version = lineTwoTable[5]
+	elseif productName == 'IRC-28C' then
+		--
+		comments = socket_command(host, 'irc.sys.comments\r\n')
+		hostname = socket_command(host, 'irc.sys.host\r\n')
+		theaterName = socket_command(host, 'irc.sys.theater_name\r\n')
+		theaterNumber = socket_command(host, 'irc.sys.theater_number\r\n')
+		dcs = socket_command(host, 'irc.sys.dcs_ip\r\n')
 	end
 
 	-- required variables are

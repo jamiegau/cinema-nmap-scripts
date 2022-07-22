@@ -16,8 +16,28 @@ Tool uses SNMP, OID for query data.
 -- @usage
 -- nmap -sS -p21,22,80,49153 --script=cinema-gdc-player <target>
 -- @output
--- PORT    STATE SERVICE
--- to be create
+-- PORT      STATE SERVICE
+-- 21/tcp    open  ftp
+-- 22/tcp    open  ssh
+-- 80/tcp    open  http
+-- | cinema-gdc-player:
+-- |   classification: dci-player
+-- |   vendor: GDC
+-- |   productName: SA2100
+-- |   serialNumber: A00871
+-- |   version: OS-SA2K-2.0.74, 8.01-build300
+-- |   osVersion: OS-SA2K-2.0.74
+-- |   manufacturer: GDC Technology Ltd
+-- |   motherboardVendor: Supermicro
+-- |   motherboardProduct: C2SBC-Q 0123456789
+-- |   biosVendor: Phoenix Technologies LTD
+-- |   biosVersion: 1.1c
+-- |   location: ChaintownCinema
+-- |   auditoriumNo: 1
+-- |   description: GDC D-cinema server
+-- |   contactDetails: movie@chinatowncinema.com.au
+-- |_  systemName: SA-2100
+-- 49153/tcp open  unknown
 
 author = "James Gardiner"
 license = "Same as Nmap--See https://nmap.org/book/man-legal.html"
