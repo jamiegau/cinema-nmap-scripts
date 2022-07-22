@@ -13,24 +13,24 @@ It would be appreciated if any issues spotted by users be posted to the ISSUES s
 ## Target Equipment
 The following is the initial set of equipment that scripts will be created for.
 
-| Vendor | type | Status | info |
-| --- | --- | --- | --- |
-| Dolby | Player | DONE | IMS1000, IMS2000, IMS3000 (DCP2000 and similar era kit unknown.) Initial beta version done, needs testing by the community. |
-| Dolby | Sound Processor |   | CP750, CP850, CP950 |
-| Barco / Cinionic | Player |   | ICMP |
-| Barco / Cinionic | Projector | DONE S1,S2 | Barco Series 1&2 ready for testing, S4 different and I would need direct access to one for implementation |
-| GDC | Player | DONE | SX2001A, SX3000, SR1000, SX4000, needs testing |
-| Qube | Player |   | XP-D |
-| NEC | Projectors | DONE | Series1 and Series2 projectors, needs testing |
-| INTEG | Automation controller |   | JNIOR 400 |
-| RLY8 | Automation controller |   | generic IP based automation controller |
-| QSC-USL | Sound Processor | DONE | JSD100, JSD60, CM8, IRC-28C, LSS-200 |
-| QSC | Sound Processor |   | Other |
+| Vendor           | type                  | Status | info |
+| ---------------- | --------------------- | ---- | --- |
+| Dolby            | Player                | DONE | IMS1000, IMS2000, IMS3000 (DCP2000 and similar era kit unknown.) Initial beta version done, needs testing by the community. |
+| Dolby            | Sound Processor       |      | Appreciate access to these units for implementation, CP750, CP850, CP950 |
+| Barco / Cinionic | Player                |      | ICMP |
+| Barco / Cinionic | Projector             | DONE S1,S2 | Barco Series 1&2 ready for testing, S4 different and I would need direct access to one for implementation |
+| GDC              | Player                | DONE | SX2001A, SX3000, SR1000, SX4000, needs testing |
+| Qube             | Player                |      | XP-D |
+| NEC              | Projectors            | DONE | Series1 and Series2 projectors, needs testing |
+| INTEG            | Automation controller | DONE | JNIOR 400 |
+| RLY8             | Automation controller | DONE | generic IP based automation controller |
+| QSC-USL          | Sound Processor       | DONE | JSD100, JSD60, CM8, IRC-28C, LSS-200 |
+| QSC              | Sound Processor       |      | Appreciate access to these devices to implement, please contact me |
 
 This will be the initial set of target devices.  Vendors and cinema engineers are welcome to submit scripts to this Repo for addition to the scripts.
 
 ## Equipment Classification
-As part of the detection of equipment, when creating a nse script to detect certain equipment, those items discovered will need to be classified into certain buckets for easy correlation into toolchains that may use these scripts.
+As part of the detection of equipment, when creating a nse script to detect certain equipment, those items discovered will need to be classified into certain buckets for easy correlation into tool-chain that may use these scripts.
 
 | Classification | Description |
 | --- | --- |
@@ -65,7 +65,7 @@ For complex devices that contain numerous version information, please use your j
 
 It is recommended to only scan for ports that are used for fingerprinting the known cinema devices in use.  The NSE scripts in the header comments name the ports that should be included in a scan for fingerprinting the devices the script targets.  Otherwise, a list of all ports the script uses is as follows.
 
-```21,22,80,1173,5000,10000,43680,43728,49153,7142,43728```
+```21,22,80,1173,5000,10000,10001,43680,43728,49153,7142,43728,9200```
 
 It is recommended that in the ```nmap``` command, the ```-p``` argument should target the ports listed above.
 
@@ -82,7 +82,7 @@ git clone https://github.com/jamiegau/cinema-nmap-scripts.git
 ```
 This will download the latest version of the scripts into a directory called `cinema-nmap-scripts`.
 
-Make sure you are root, or utilise the *sudo* command as follows.
+Make sure you have root privileges or utilise the *sudo* command as follows.
 ```
 sudo nmap -sS -n --stats-every 5 -p 21,22,80,111,5000,10000 --script cinema-nmap-scripts/cinema-dolby-player --script-args 'username=manager,password=password,getcerts=true' 10.0.0.1-200
 ```
@@ -91,9 +91,17 @@ Note, the script args are optional and need to be used if the default login cred
  - `-n` will disable DSN resolution/lookup.  Likely not required under this use model.
  - `--stats-every 5` will have updates printed to the screen every 5 seconds if the scan is taking a considerable time.
  - `-p 21,22,80,111,5000,10000` indicates to ONLY SCAN the ports listed.  This will stop it from scanning many thousands of ports and only scan the ports needed to fingerprint the cinema devices.  If scanning for many different types of devices at the same time, you must name all the ports these scripts need to fingerprint the device you wish to detect.
- - `--script cinema-nmap-scripts/cinema-dolby-player` tells the nmap scripting engine what script to run.  You can give it wild cards, for example, `cinema-nmap-scripts/`cinema-*` would run all scripts availabe in the directory starting the 'cinema-'.
- - `--script-args 'username=manager,password=password,getcerts=true'`  Arguments are option.  In this case, you can override the common login credentials if they have been changed.  You can also ask for it to pull out the public certificates for the device as part of the scan. By default Certs are not included.
+ - `--script cinema-nmap-scripts/cinema-dolby-player` tells the nmap scripting engine what script to run.  You can give it wild cards, for example, `cinema-nmap-scripts/`cinema-*` would run all scripts available in the directory starting the 'cinema-'.
+ - `--script-args 'username=manager,password=password,getcerts=true'`  Arguments are option.  In this case, you can override the common login credentials if they have been changed.  You can also ask for it to pull out the public certificates for the device as part of the scan. By default, Certs are not included.
  - `10.0.0.1-200` is the address range to scan.  In this case, subnet 10.0.0.x and all devices on ip address 1 to 200 on that subnet.  You can also list multiple numbers of IP addresses or ranges.
+
+### Creating your own scripts
+
+While I will attempt to update these scripts when possible, it would be appreciated if others could contribute to these scripts. Direct access to the equipment is required to implement and test the scripts.
+
+The objective of these scripts is to identify the devices on a projection network without causing any potential side effects.  A projection network is a critical space in that you do not want to cause a session to error. (for example, a session stoped unexpectedly or lights come on/off at the wrong time).  Due to this, it is recommended that the ```portrule``` section of the script is more particular in detecting a device is the right device before it starts an intrusive test.  This is done by looking at more than a single port being available.  I refer to this as a port fingerprint, in that a certin number of ports must be active/inactive allowing the script to have a much better idea if a device is what we expect.
+
+The current scripts in this repo are good examples of how to do this, and also why the examples requires numerous ports to be scanned when the scripts are run.
 
 ### Expected output
 NOTE, this is the expected output.  The CERTIFICATEs are not shown by default and must be turned on as an argument to the script.
