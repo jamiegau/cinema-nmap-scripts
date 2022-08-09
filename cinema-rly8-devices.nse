@@ -144,11 +144,11 @@ end
 
 -- Now lets try and query the player for some useful information
 action = function(host, port)
-	-- test code
-	local json_str = '{"version":"V1.0U"}'
-	local json_table, json_table2 = json.parse(json_str)
-	stdnse.debug('json_table = ' .. nsedebug.tostr(json_table))
-	stdnse.debug('json_table2 = ' .. nsedebug.tostr(json_table2))
+	-- -- test code
+	-- local json_str = '{"version":"V1.0U"}'
+	-- local json_table, json_table2 = json.parse(json_str)
+	-- stdnse.debug('json_table = ' .. nsedebug.tostr(json_table))
+	-- stdnse.debug('json_table2 = ' .. nsedebug.tostr(json_table2))
 	--
 	local output = stdnse.output_table()
 	-- required variables are

@@ -25,8 +25,8 @@ The following is the initial set of equipment that scripts will be created for.
 | Qube             | Player XP-I           | DONE | XP-D script may work with XP-I but not expected.  Need access to a XP-I, Any helpers?|
 | NEC              | Projectors            | DONE | Series1 and Series2 projectors, needs testing |
 | INTEG            | Automation controller | DONE | JNIOR 400 |
-| RLY8             | Automation controller | DONE | generic IP based automation controller |
-| RLY8             | Automation controller | DONE | generic IP based automation controller |
+| RLY8             | Automation controller | DONE | generic IP based 8 output automation controller with Socket Control|
+| KMTronic         | Automation controller | DONE | generic IP based 8 output automation controller with Web and UDP control |
 | QSC-USL          | Sound Processor       | DONE | JSD100, JSD60, CM8, IRC-28C, LSS-200 |
 | QSC              | Sound Processor       |      | Appreciate access to these devices to implement, please contact me |
 
@@ -102,9 +102,18 @@ Note, the script args are optional and need to be used if the default login cred
 
 While I will attempt to update these scripts when possible, it would be appreciated if others could contribute to these scripts. Direct access to the equipment is required to implement and test the scripts.
 
-The objective of these scripts is to identify the devices on a projection network without causing any potential side effects.  A projection network is a critical space in that you do not want to cause a session to error. (for example, a session stoped unexpectedly or lights come on/off at the wrong time).  Due to this, it is recommended that the ```portrule``` section of the script is more particular in detecting a device is the right device before it starts an intrusive test.  This is done by looking at more than a single port being available.  I refer to this as a port fingerprint, in that a certin number of ports must be active/inactive allowing the script to have a much better idea if a device is what we expect.
+The objective of these scripts is to identify the devices on a projection network without causing any potential side effects.  A projection network is critical infrastructure in that you do not want to cause a session to error. (for example, a session stopped unexpectedly or lights come on/off at the wrong time).  Due to this, it is recommended that the ```portrule``` section of the script is more particular in detecting if a device is exactly what we expect before it starts an intrusive test.  This is done by looking at more than a single port to see if it is open or closed.  I refer to this as a port fingerprint, in that a certain number of ports must be active/inactive allowing the script to have a much better idea if a device is what we expect.
 
-The current scripts in this repo are good examples of how to do this, and also why the examples requires numerous ports to be scanned when the scripts are run.
+The current scripts in this repo are good examples of how to do this, and also why the examples require numerous ports to be scanned when the scripts are run.  However, the suggested ports to scan are still far fewer than what would be scanned by default.
+
+There are 4 main communication paths for querying a device.
+1. Basic Socket command
+2. SOAP commands over HTTP
+3. Binary socket commands
+4. Basic HTTP requests
+
+The current scripts have good examples of each of this type of implementation.  It is suggested you review them to get an idea of how to approach a device you would like to implement.
+
 
 ### Expected output
 NOTE, this is the expected output.  The CERTIFICATEs are not shown by default and must be turned on as an argument to the script.

@@ -92,7 +92,7 @@ local function soap_GetPlayerInfo_query(host, port, sessionId)
 
 	local result = http.post(host.ip, 8080, path, opt, nil, req)
 	-- stdnse.pretty_printer(result)
-	print('BODY: ' .. result['body'])
+	-- print('BODY: ' .. result['body'])
 	if (result['status'] ~= 200 or result['content-length'] == 0) then
 		return false, 'GetPlayerInfo Failed'
 	end
