@@ -16,8 +16,8 @@ The following is the initial set of equipment that scripts will be created for.
 | Vendor           | type                  | Status | info |
 | ---------------- | --------------------- | ---- | --- |
 | Dolby            | Player                | DONE | IMS1000, IMS2000, IMS3000 (DCP2000 and similar era kit unknown.) Initial beta version done, needs testing by the community. |
-| Dolby            | Sound Processor CP750 | InDev | Appreciate access to these units for implementation, CP750 |
-| Dolby            | Sound Processor CP850/CP950 |    | Need access to these units, Any Helpers? |
+| Dolby            | Sound Processor CP750 | DONE | Dolby CP750 Sound Processor |
+| Dolby            | Sound Processor CP850/CP950 | help | Different API from CP750, need access to these units, Any Helpers? |
 | Barco / Cinionic | Player                | InDev | ICMP |
 | Barco / Cinionic | Projector             | DONE S1,S2 | Barco Series 1&2 ready for testing, S4 different and I would need direct access to one for implementation |
 | GDC              | Player                | DONE | SX2001A, SX3000, SR1000, SX4000, needs testing |
@@ -27,6 +27,7 @@ The following is the initial set of equipment that scripts will be created for.
 | INTEG            | Automation controller | DONE | JNIOR 400 |
 | RLY8             | Automation controller | DONE | generic IP based 8 output automation controller with Socket Control|
 | KMTronic         | Automation controller | DONE | generic IP based 8 output automation controller with Web and UDP control |
+| Edge             | Automation controller | WAIT | generic IP based 24 output automation controller |
 | QSC-USL          | Sound Processor       | DONE | JSD100, JSD60, CM8, IRC-28C, LSS-200 |
 | QSC              | Sound Processor       |      | Appreciate access to these devices to implement, please contact me |
 
@@ -68,7 +69,7 @@ For complex devices that contain numerous version information, please use your j
 
 It is recommended to only scan for ports that are used for fingerprinting the known cinema devices in use.  The NSE scripts in the header comments name the ports that should be included in a scan for fingerprinting the devices the script targets.  Otherwise, a list of all ports the script uses is as follows.
 
-```21,22,80,1173,5000,8080,10000,10001,43680,43728,49153,7142,9200,49155```
+```21,22,80,111,1125,1173,5000,8080,10000,10001,43680,43728,49153,7142,9200,49155,61408```
 
 It is recommended that in the ```nmap``` command, the ```-p``` argument should target the ports listed above.
 
