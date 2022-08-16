@@ -52,6 +52,13 @@ As part of the detection of equipment, when creating a nse script to detect cert
 
 Note: Some classifications are for completeness purposes only.  For example, pos-devices, IP-cameras are many and users of these scripts may want to implement their own NSE script for detecting the type of cameras they use.  Other general network switches and devices are not expected to have scripts in this repo but again, users may want to add to the scripts for internal use.
 
+# How to use for wildcard scan of a projection network
+
+Once you have nmap installed and downloaded the Repo from Github, you will have the ```cinema-nmap-scripts``` directory available.  Use the following command to scan a projection network and apply all scripts to the scan:
+
+```sudo nmap -n -sS --open -p 21,22,80,111,1125,1173,5000,8080,10000,10001,43680,43728,49153,7142,9200,49155,61408 --script cinema-nmap-scripts/ <Target Ip range as for example: 10.1.2.1-254 or 10.1.2.0/24>```
+
+
 ## Expected results from all devices detected
 To help with programmatically digesting the output from the ```nmap``` scripts typically by using the XML output using the arguments ```-oX```, a number of variables are expected to be present for the output for all scripts.
 

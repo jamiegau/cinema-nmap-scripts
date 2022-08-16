@@ -30,7 +30,7 @@ Will attempt to pull out software and firmware version of system
 
 author = "James Gardiner"
 license = "Same as Nmap--See https://nmap.org/book/man-legal.html"
-categories = { "safe", "intrusive" }
+categories = { "cinema", "safe", "intrusive" }
 
 -- Check for the right port fingerprint of a Qube XP-D
 portrule = function(host, port)

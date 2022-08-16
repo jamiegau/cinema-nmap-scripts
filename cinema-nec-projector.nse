@@ -21,7 +21,7 @@ Tool uses SNMP, OID for query data.
 
 author = "James Gardiner"
 license = "Same as Nmap--See https://nmap.org/book/man-legal.html"
-categories = { "safe", "intrusive" }
+categories = { "cinema", "safe", "intrusive" }
 
 -- if port 80 and port  21, 22, 1173, 7142, 43728 are the right state, we try and query the target
 portrule = function(host, port)

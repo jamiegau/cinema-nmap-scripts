@@ -28,7 +28,7 @@ Will attempt to pull out software and firmware version of system
 
 author = "James Gardiner"
 license = "Same as Nmap--See https://nmap.org/book/man-legal.html"
-categories = { "safe", "intrusive" }
+categories = { "cinema", "safe", "intrusive" }
 
 -- if port 2000 is open, we try and query the system Doby Player
 portrule = function(host, port)
