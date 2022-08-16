@@ -14,22 +14,23 @@ It would be appreciated if any issues spotted by users be posted to the ISSUES s
 The following is the initial set of equipment that scripts will be created for.
 
 | Vendor           | type                  | Status | info |
-| ---------------- | --------------------- | ---- | --- |
-| Dolby            | Player                | DONE | IMS1000, IMS2000, IMS3000 (DCP2000 and similar era kit unknown.) Initial beta version done, needs testing by the community. |
-| Dolby            | Sound Processor CP750 | DONE | Dolby CP750 Sound Processor |
+| ---------------- | --------------------- | ------ | ---- |
+| Christie         | Projectors            | InDev  | Have documentation, all I need is access to some projectors. Help needed |
+| Dolby            | Player                | DONE   | IMS1000, IMS2000, IMS3000 (DCP2000 and similar era kit unknown.) Initial beta version done, needs testing by the community. |
+| Dolby            | Sound Processor CP750 | DONE   | Dolby CP750 Sound Processor |
 | Dolby            | Sound Processor CP850/CP950 | help | Different API from CP750, need access to these units, Any Helpers? |
-| Barco / Cinionic | Player                | InDev | ICMP |
+| Barco / Cinionic | Player                | InDev  | ICMP |
 | Barco / Cinionic | Projector             | DONE S1,S2 | Barco Series 1&2 ready for testing, S4 different and I would need direct access to one for implementation |
-| GDC              | Player                | DONE | SX2001A, SX3000, SR1000, SX4000, needs testing |
-| Qube             | Player XP-D           | DONE | XP-D |
-| Qube             | Player XP-I           | DONE | XP-D script may work with XP-I but not expected.  Need access to a XP-I, Any helpers?|
-| NEC              | Projectors            | DONE | Series1 and Series2 projectors, needs testing |
-| INTEG            | Automation controller | DONE | JNIOR 400 |
-| RLY8             | Automation controller | DONE | generic IP based 8 output automation controller with Socket Control|
-| KMTronic         | Automation controller | DONE | generic IP based 8 output automation controller with Web and UDP control |
-| Edge             | Automation controller | WAIT | generic IP based 24 output automation controller |
-| QSC-USL          | Sound Processor       | DONE | JSD100, JSD60, CM8, IRC-28C, LSS-200 |
-| QSC              | Sound Processor       |      | Appreciate access to these devices to implement, please contact me |
+| GDC              | Player                | DONE   | SX2001A, SX3000, SR1000, SX4000, needs testing |
+| Qube             | Player XP-D           | DONE   | XP-D |
+| Qube             | Player XP-I           | DONE   | XP-D script may work with XP-I but not expected.  Need access to a XP-I, Any helpers?|
+| NEC              | Projectors            | DONE   | Series1 and Series2 projectors, needs testing |
+| INTEG            | Automation controller | DONE   | JNIOR 400 |
+| RLY8             | Automation controller | DONE   | generic IP based 8 output automation controller with Socket Control|
+| KMTronic         | Automation controller | DONE   | generic IP based 8 output automation controller with Web and UDP control |
+| Edge             | Automation controller | WAIT   | generic IP based 24 output automation controller |
+| QSC-USL          | Sound Processor       | DONE   | JSD100, JSD60, CM8, IRC-28C, LSS-200 |
+| QSC              | Sound Processor       |        | Appreciate access to these devices to implement, please contact me |
 
 This will be the initial set of target devices.  Vendors and cinema engineers are welcome to submit scripts to this Repo for addition to the scripts.
 
