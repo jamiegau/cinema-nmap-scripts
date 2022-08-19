@@ -112,6 +112,9 @@ action = function(host, port)
 	--
 	-- serialNumber/vSerialNoPJ .1.3.6.1.4.1.119.2.3.123.1.12.1.0
 	output.serialNumber = get_snmp_IOD_value(host, snmp_port, '.1.3.6.1.4.1.119.2.3.123.1.12.1.0')
+	if output.serialNumber == '' then
+		output.serialNumber = get_snmp_IOD_value(host, snmp_port, '.1.3.6.1.4.1.119.2.3.123.1.14.0')
+	end
 	--
 	-- vVerBIOS - .1.3.6.1.4.1.119.2.3.123.1.2.1.0
 	local vVerBIOS = get_snmp_IOD_value(host, snmp_port, '.1.3.6.1.4.1.119.2.3.123.1.2.1.0')
