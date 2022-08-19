@@ -48,9 +48,13 @@ portrule = function(host, port)
 	local res = false
 	if ftp_open.state ~= 'open' and
 		ssh_open.state ~= 'open' and
-		dci_open.state ~= 'open' and
 		(necS1_open.state == 'open' or necS2_open.state == 'open') then
-		res = true
+		if necS1_open.state == 'open' and dci_open.state ~= 'open' then
+			res = true
+		end
+		if necS1_open.state == 'open' and dci_open.state == 'open' then
+			res = true
+		end
 	end
 	return res
 end
