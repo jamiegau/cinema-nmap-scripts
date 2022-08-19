@@ -52,7 +52,7 @@ portrule = function(host, port)
 		if necS1_open.state == 'open' and dci_open.state ~= 'open' then
 			res = true
 		end
-		if necS1_open.state == 'open' and dci_open.state == 'open' then
+		if necS2_open.state == 'open' and dci_open.state == 'open' then
 			res = true
 		end
 	end
