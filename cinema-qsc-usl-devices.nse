@@ -131,6 +131,23 @@ local function getHttpUrl(host, urlPath)
 	return res, body
 end
 
+local function magiclines(s)
+	if s:sub(-1) ~= "\n" then s = s .. "\n" end
+	return s:gmatch("(.-)\n")
+end
+
+local function oldJsd100_search(search_str, body)
+	local res
+	for line in magiclines(body) do
+		if string.find(line, '<tr><td>' .. search_str .. '</td><td>') then
+			local line_array = Split(line, '</td><td>')
+			stdnse.debug("line_array = " .. nsedebug.tostr(line_array))
+			res = line_array[1]
+		end
+	end
+	return res
+end
+
 -- Now lets try and query the player for some useful information
 action = function(host, port)
 	local productName = 'na'
@@ -169,15 +186,22 @@ action = function(host, port)
 			get_status3, page_body3 = getHttpUrl(host, '/')
 			stdnse.debug("get_status3 = " .. nsedebug.tostr(get_status3))
 			if get_status3 == true then
-				-- loks lke a IRC-28C
+				-- looks like a IRC-28C or older JSD100
 				local page_title = all_trim(string.match(page_body3, '<title>(.-)</title>'))
-				if page_title == "USL Caption Encoder" then
+				stdnse.debug("page_title = " .. nsedebug.tostr(page_title))
+				if page_title == 'USL Caption Encoder' then
 					-- special case, a older firmware IRC-28C
-					stdnse.debug("special case, a older firmware IRC-28C")
+					stdnse.debug('special case, a older firmware IRC-28C')
 					local h1 = all_trim(string.match(page_body3, '<h1>(.-)</h1>'))
-					productName = "IRC-28C"
-					version = split(h1, " ")[4]
+					productName = 'IRC-28C'
+					version = split(h1, ' ')[4]
 					classification = 'accessability'
+				end
+				if string.find(page_title, 'JSD-100') then
+					-- special case, a older firmware JSD-100
+					stdnse.debug('special case, a older firmware JSD-100')
+					local h1 = all_trim(string.match(page_body3, '<h1>(.-)</h1>'))
+					productName = 'OLD-JSD-100'
 				end
 			else
 				return false
@@ -203,10 +227,11 @@ action = function(host, port)
 		-- print('--------------------- lineOneTable -----------------')
 		-- stdnse.pretty_printer(lineOneTable)
 		if lineOneTable[3] == "JSD-60" or
-			lineOneTable[3] == "JSD-100" or
-			lineOneTable[3] == "CM-8E" then
+			lineOneTable[3] == "JSD-100" then
 			classification = 'sound-processor'
 			productName = lineOneTable[3]
+		elseif lineOneTable[3] == "CM-8E" then
+			classification = 'sound-device'
 		elseif lineOneTable[3] == "LSS-200" then
 			classification = 'quality-assurance'
 			productName = lineOneTable[3]
@@ -255,6 +280,17 @@ action = function(host, port)
 		picVersion = verTable[3]
 		dspVersion = verTable[4]
 		version = PCBversion .. ',' .. bootloaderVersion .. ',' .. picVersion .. ',' .. dspVersion
+	elseif productName == 'OLD-JSD-100' then
+		productName = 'JSD-100'
+		serialNumber = 'na'
+		theaterName = oldJsd100_search('Theater Name', get_status3)
+		theaterNumber = oldJsd100_search('Theater Number', get_status3)
+		dcs = oldJsd100_search('Digital Server', get_status3)
+		automation = oldJsd100_search('Automation', get_status3)
+		comments = oldJsd100_search('Comments', get_status3)
+		projector = oldJsd100_search('Projector', get_status3)
+		version = oldJsd100_search('Model Number', get_status3)
+		hostname = oldJsd100_search('Host Name', get_status3)
 	elseif productName == 'CM-8E' then
 		serialNumber = all_trim(socket_command(host, 'cm8.sys.serial_number\r\n'))
 		theaterName = socket_command(host, 'cm8.sys.theater_name\r\n')

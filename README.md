@@ -43,8 +43,9 @@ As part of the detection of equipment, when creating a nse script to detect cert
 | dci-player | a DCI certified cinema player. |
 | e-player | a electronic media player such as a BluRay player, or device that plays domestic video codecs (MP4, MV1, MOV, etc) |
 | sound-processor | A typical cinema sound processor device including monitor or amplifiers. |
+| sound-device | An additional IP based device connected to the sound system. i.e. Networked Amps etc. |
 | automation-io | A device that interfaces automation triggers, IN or OUT. |
-| accessability | A device that is connected with accessability features. |
+| accessibility | A device that is connected with accessability features. |
 | ip-camera | IP-video cameras for audience monitoring or other. |
 | tms-server | a TMS server. |
 | network-device | a device used for networking such as a switch, firewall or VPN gateway. |
