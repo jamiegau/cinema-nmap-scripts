@@ -195,7 +195,7 @@ action = function(host, port)
 					local h1 = all_trim(string.match(page_body3, '<h1>(.-)</h1>'))
 					productName = 'IRC-28C'
 					version = split(h1, ' ')[4]
-					classification = 'accessability'
+					classification = 'accessibility'
 				end
 				if string.find(page_title, 'JSD-100') then
 					-- special case, a older firmware JSD-100
@@ -239,7 +239,7 @@ action = function(host, port)
 			version = 'to implement'
 		elseif productName == "IRC-28C" then
 			-- productName = "IRC-28C"
-			classification = 'accessability'
+			classification = 'accessibility'
 		end
 	end
 
