@@ -4,8 +4,10 @@ local http = require "http"
 local slaxml = require "slaxml"
 
 description = [[
-Detects socket fingerprint of Dolby or Doremi DCI cinema players and flags if found.
+Detects socket fingerprint of Barco DCI cinema players and flags if found.
 Will attempt to pull out software and firmware version of system
+
+TEMPEATE (based on Dolby) TODO  not finished, need access to Player.
 ]]
 
 --------------------------------------------------------------------
@@ -37,7 +39,7 @@ portrule = function(host, port)
 	local cp2_open = nmap.get_port_state(host, cp2)
 	local cp3 = { number = 5000, protocol = "tcp" }
 	local cp3_open = nmap.get_port_state(host, cp3)
-	local cp4 = { number = 10000, protocol = "tcp" }
+	local cp4 = { number = 23232, protocol = "tcp" }
 	local cp4_open = nmap.get_port_state(host, cp4)
 
 	local res = false
