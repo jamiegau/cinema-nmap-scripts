@@ -136,13 +136,36 @@ local function magiclines(s)
 	return s:gmatch("(.-)\n")
 end
 
+function Split(s, delimiter)
+	local result = {};
+	for match in (s .. delimiter):gmatch("(.-)" .. delimiter) do
+		table.insert(result, match);
+	end
+	return result;
+end
+
 local function oldJsd100_search(search_str, body)
+	-- print("oldJsd100_search(body = " .. body .. ")")
 	local res
-	for line in magiclines(body) do
+	local lines = {}
+	for s in body:gmatch("[^\r\n]+") do
+		table.insert(lines, s)
+	end
+	-- stdnse.pretty_printer(lines)
+	for i, line in ipairs(lines) do
+		-- print("line = " .. i .. ": " .. line)
 		if string.find(line, '<tr><td>' .. search_str .. '</td><td>') then
 			local line_array = Split(line, '</td><td>')
-			stdnse.debug("line_array = " .. nsedebug.tostr(line_array))
-			res = line_array[1]
+			-- stdnse.debug("line_array = " .. nsedebug.tostr(line_array))
+			res = line_array[2]:gsub("</td></tr>", ""):gsub("[%s]", "")
+
+			if search_str == "Model Number" then
+				res = res:gsub("JSD%-100v", "")
+			end
+			if search_str == "Host Name" then
+				res = res:gsub("</tr>", "")
+			end
+			break
 		end
 	end
 	return res
@@ -173,18 +196,17 @@ action = function(host, port)
 	-- Fetch the http://host/ConfigFlash.html
 	local get_status, configFlash_body
 	local get_status2, configFlash_body2
-	local get_status3, page_body3
+	local get_status3, page_body3 = "not-set"
 
 	get_status, configFlash_body = getHttpUrl(host, '/ConfigFlash.html')
-	stdnse.debug("get_status = " .. nsedebug.tostr(get_status))
+	-- stdnse.debug("get_status = " .. nsedebug.tostr(get_status))
 	if get_status == false then
 		get_status2, configFlash_body = getHttpUrl(host, '/debug/ConfigFlash.html')
-		stdnse.debug("get_status2 = " .. nsedebug.tostr(get_status2))
+		-- stdnse.debug("get_status2 = " .. nsedebug.tostr(get_status2))
 		if get_status2 == false then
 			--
 			-- could be an old IRC-28C with older firmware that does not suppore ConfigFlash.html
 			get_status3, page_body3 = getHttpUrl(host, '/')
-			stdnse.debug("get_status3 = " .. nsedebug.tostr(get_status3))
 			if get_status3 == true then
 				-- looks like a IRC-28C or older JSD100
 				local page_title = all_trim(string.match(page_body3, '<title>(.-)</title>'))
@@ -196,24 +218,25 @@ action = function(host, port)
 					productName = 'IRC-28C'
 					version = split(h1, ' ')[4]
 					classification = 'accessibility'
-				end
-				if string.find(page_title, 'JSD-100') then
+				elseif string.find(page_title, "JSD%-100") then -- Note dash -, needs special escpate char %
 					-- special case, a older firmware JSD-100
 					stdnse.debug('special case, a older firmware JSD-100')
-					local h1 = all_trim(string.match(page_body3, '<h1>(.-)</h1>'))
 					productName = 'OLD-JSD-100'
 				end
 			else
 				return false
 			end
 		end
+	else
+		-- stdnse.debug("configFlash_body = " .. nsedebug.tostr(configFlash_body))
 	end
 
 	if configFlash_body ~= nil then
-		-- stdnse.pretty_printer(configFlash_body)
+		-- stdnse.debug("configFlash_body = " .. nsedebug.tostr(configFlash_body))
 		local configFlash = string.match(configFlash_body, '<pre>(.-)</pre>')
 		configFlash = all_trim(configFlash)
-		configFlash = configFlash:gsub("\x0D", "")
+		-- configFlash = configFlash:gsub("\x0D", "")
+		stdnse.debug("configFlash = " .. nsedebug.tostr(configFlash))
 		-- before we plit into lines, check if its a IRC by looking for 'irc.sys.ip'
 		local irc_start, irc_end = string.find(configFlash, 'irc.sys.ip')
 		if irc_start ~= nil then
@@ -221,16 +244,18 @@ action = function(host, port)
 		end
 		--
 		local configFlash_table = split(configFlash, "\n")
-		-- stdnse.pretty_printer(configFlash_table)
+		stdnse.debug("configFlash_body = " .. nsedebug.tostr(configFlash_table))
 		lineOneTable = split(configFlash_table[1], ' ')
+		stdnse.debug("lineOneTable = " .. nsedebug.tostr(lineOneTable))
 		lineTwoTable = split(configFlash_table[2], ' ')
-		-- print('--------------------- lineOneTable -----------------')
-		-- stdnse.pretty_printer(lineOneTable)
+		stdnse.debug("lineTwoTable = " .. nsedebug.tostr(lineTwoTable))
+		-- tes what it is based on the LINE info.
 		if lineOneTable[3] == "JSD-60" or
 			lineOneTable[3] == "JSD-100" then
 			classification = 'sound-processor'
 			productName = lineOneTable[3]
 		elseif lineOneTable[3] == "CM-8E" then
+			productName = lineOneTable[3]
 			classification = 'sound-device'
 		elseif lineOneTable[3] == "LSS-200" then
 			classification = 'quality-assurance'
@@ -280,17 +305,23 @@ action = function(host, port)
 		picVersion = verTable[3]
 		dspVersion = verTable[4]
 		version = PCBversion .. ',' .. bootloaderVersion .. ',' .. picVersion .. ',' .. dspVersion
+		--
 	elseif productName == 'OLD-JSD-100' then
+		-- stdnse.debug("OLD-JSD-100 and page_body3 = " .. page_body3)
+		-- stdnse.debug("OLD-JSD-100 and page_body3 = " .. nsedebug.tostr(page_body3))
+		--
 		productName = 'JSD-100'
 		serialNumber = 'na'
-		theaterName = oldJsd100_search('Theater Name', get_status3)
-		theaterNumber = oldJsd100_search('Theater Number', get_status3)
-		dcs = oldJsd100_search('Digital Server', get_status3)
-		automation = oldJsd100_search('Automation', get_status3)
-		comments = oldJsd100_search('Comments', get_status3)
-		projector = oldJsd100_search('Projector', get_status3)
-		version = oldJsd100_search('Model Number', get_status3)
-		hostname = oldJsd100_search('Host Name', get_status3)
+		classification = 'sound-processor'
+		theaterName = oldJsd100_search('Theater Name', page_body3)
+		theaterNumber = oldJsd100_search('Theater Number', page_body3)
+		dcs = oldJsd100_search('Digital Server', page_body3)
+		automation = oldJsd100_search('Automation', page_body3)
+		comments = oldJsd100_search('Comments', page_body3)
+		projector = oldJsd100_search('Projector', page_body3)
+		version = oldJsd100_search('Model Number', page_body3)
+		hostname = oldJsd100_search('Host Name', page_body3)
+		--
 	elseif productName == 'CM-8E' then
 		serialNumber = all_trim(socket_command(host, 'cm8.sys.serial_number\r\n'))
 		theaterName = socket_command(host, 'cm8.sys.theater_name\r\n')
@@ -301,7 +332,8 @@ action = function(host, port)
 		comments = socket_command(host, 'cm8.sys.comments\r\n')
 		projector = socket_command(host, 'cm8.sys.projector\r\n')
 		hostname = socket_command(host, 'cm8.sys.host\r\n')
-		version = lineTwoTable[5]
+		version = all_trim(lineTwoTable[5])
+		--
 	elseif productName == 'IRC-28C' then
 		--
 		comments = socket_command(host, 'irc.sys.comments\r\n')
