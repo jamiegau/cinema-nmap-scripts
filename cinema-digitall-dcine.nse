@@ -11,13 +11,14 @@ Will attempt to pull out software and firmware version of system
 --------------------------------------------------------------------
 ---
 -- @usage
--- nmap -sS -p 21,22,80,4242,5900 --script=cinema-digitall-dcine <target>
+-- nmap -sS -p 21,80,4241,4242,5900 --script=cinema-digitall-dcine <target>
 -- @output
 -- PORT      STATE  SERVICE REASON
 -- PORT     STATE  SERVICE
 -- 21/tcp   open   ftp
 -- 22/tcp   closed ssh
 -- 80/tcp   open   http
+-- 4241/tcp open
 -- 4242/tcp open   vrml-multi-use
 -- | cinema-digitall-dcine:
 -- |   classification: e-cinema
@@ -49,8 +50,8 @@ portrule = function(host, port)
 	-- if port 80 and all these following ports are open, we can assume its a Dolby player
 	local ftp = { number = 21, protocol = "tcp" }
 	local ftp_open = nmap.get_port_state(host, ftp)
-	local ssh = { number = 22, protocol = "tcp" }
-	local ssh_open = nmap.get_port_state(host, ssh)
+	local p4241 = { number = 4241, protocol = "tcp" }
+	local p4241_open = nmap.get_port_state(host, p4241)
 	local http80 = { number = 80, protocol = "tcp" }
 	local http80_open = nmap.get_port_state(host, http80)
 	local vnc = { number = 5900, protocol = "tcp" }
@@ -59,7 +60,7 @@ portrule = function(host, port)
 
 	local res = false
 	if ftp_open.state == 'open' and
-		ssh_open.state ~= 'open' and
+		p4241_open.state == 'open' and
 		http80_open.state == 'open' and
 		vnc_open.state == 'open' then
 		res = true
@@ -122,7 +123,9 @@ local function dcine_request_data(host)
 		return false, 'Socket exception: ' .. result
 	end
 
+	result = result:gsub("##", "\n")
 	data_str = all_trim(result)
+	print(data_str)
 
 	return true, 'OK', data_str
 end
@@ -153,8 +156,11 @@ local function getDcineConfig(key, data_str)
 			break
 		end
 	end
-	if key == "sVersion" or key == "sBuild" or key == "sOwner" then
-		res = unescape(res)
+	res = unescape(res)
+	if key == "sLicense" and string.find(res, "-CX") then
+		local line_array = Split(res, '-CX')
+		-- stdnse.debug("line_array = " .. nsedebug.tostr(line_array))
+		res = all_trim(line_array[2])
 	end
 	return res
 end
