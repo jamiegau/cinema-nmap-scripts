@@ -125,8 +125,7 @@ local function dcine_request_data(host)
 
 	result = result:gsub("##", "\n")
 	data_str = all_trim(result)
-	print(data_str)
-
+	
 	return true, 'OK', data_str
 end
 

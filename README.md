@@ -31,6 +31,7 @@ The following is the initial set of equipment that scripts will be created for.
 | Edge             | Automation controller | WAIT   | generic IP based 24 output automation controller |
 | QSC-USL          | Sound Processor       | DONE   | JSD100, JSD60, CM8, IRC-28C, LSS-200 |
 | QSC              | Sound Processor       |        | Appreciate access to these devices to implement, please contact me |
+| DataSat          | Sound Processor       | DONE   | AP20 Sound processor by DataSat |
 
 This will be the initial set of target devices.  Vendors and cinema engineers are welcome to submit scripts to this Repo for addition to the scripts.
 
@@ -58,7 +59,7 @@ Note: Some classifications are for completeness purposes only.  For example, pos
 
 Once you have nmap installed and downloaded the Repo from Github, you will have the ```cinema-nmap-scripts``` directory available.  Use the following command to scan a projection network and apply all scripts to the scan:
 
-```sudo nmap -n -sS --open -p 21,22,80,111,1125,1173,5000,8080,10000,10001,43680,43728,49153,7142,9200,49155,61408 --script cinema-nmap-scripts/ <Target Ip range as for example: 10.1.2.1-254 or 10.1.2.0/24>```
+```sudo nmap -n -sS --open -p 21,22,23,80,111,1125,1173,2000,4241,4242,5000,5900,8080,7142,9200,10000,10001,14500,43680,43728,49153,49155,61408 --script cinema-nmap-scripts/ <Target Ip range as for example: 10.1.2.1-254 or 10.1.2.0/24>```
 
 
 ## Expected results from all devices detected
@@ -78,7 +79,7 @@ For complex devices that contain numerous version information, please use your j
 
 It is recommended to only scan for ports that are used for fingerprinting the known cinema devices in use.  The NSE scripts in the header comments name the ports that should be included in a scan for fingerprinting the devices the script targets.  Otherwise, a list of all ports the script uses is as follows.
 
-```21,22,80,111,1125,1173,5000,8080,10000,10001,43680,43728,49153,7142,9200,49155,61408```
+```21,22,23,80,111,1125,1173,2000,4241,4242,5000,5900,8080,7142,9200,10000,10001,14500,43680,43728,49153,49155,61408```
 
 It is recommended that in the ```nmap``` command, the ```-p``` argument should target the ports listed above.
 
