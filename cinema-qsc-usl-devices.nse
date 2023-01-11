@@ -83,6 +83,10 @@ function TableConcat(t1, t2)
 	return t1
 end
 
+local function starts_with(str, start)
+	return str:sub(1, #start) == start
+end
+
 local function socket_command(host, cmd)
 	local port = { number = 10001, protocol = 'tcp' }
 	local socket = nmap.new_socket()
@@ -103,8 +107,27 @@ local function socket_command(host, cmd)
 	local response = try(socket:receive_lines(1))
 	socket:close()
 
-	response = all_trim(response)
-	return response
+	local trim_response = all_trim(response)
+	-- print('response [' .. response .. ']')
+	--
+	-- fix a wierd bug: some times we get the serialNumber
+	-- with 300 in front of it.
+	-- no idea why and cannot reproduce. so...
+	-- So adding this code to try and sort it out.
+	if string.len(trim_response) == 7 and starts_with(trim_response, '300') then
+		stdnse.debug("DEAL WITH ERROR: response = " .. nsedebug.tostr(response))
+		-- write the exact string we got back from target
+		local f = assert(io.open("/tmp/cinema-qsc-usl-device.debug.txt", "a"))
+		f:write("ERR: " .. all_trim(cmd) .. " : " .. response .. "\n")
+		f:close()
+		trim_response = string.sub(trim_response, 4, -1)
+	end
+
+	local f = assert(io.open("/tmp/cinema-qsc-usl-device.debug.txt", "a"))
+	f:write("res: " .. all_trim(cmd) .. " : " .. response .. "\n")
+	f:close()
+
+	return trim_response
 end
 
 local function split(str, sep)
@@ -260,8 +283,8 @@ action = function(host, port)
 		elseif lineOneTable[3] == "LSS-200" then
 			classification = 'quality-assurance'
 			productName = lineOneTable[3]
-			serialNumber = 'to implement'
-			version = 'to implement'
+			serialNumber = 'to_implement'
+			version = 'to_implement'
 		elseif productName == "IRC-28C" then
 			-- productName = "IRC-28C"
 			classification = 'accessibility'
@@ -272,6 +295,8 @@ action = function(host, port)
 
 	if productName == 'JSD-60' then
 		serialNumber = all_trim(socket_command(host, 'jsd60.sys.serial_number\r\n'))
+		stdnse.debug("serialNumber = " .. nsedebug.tostr(serialNumber))
+
 		theaterName = socket_command(host, 'jsd60.sys.theater_name\r\n')
 		theaterNumber = socket_command(host, 'jsd60.sys.theater_number\r\n')
 		dcs = socket_command(host, 'jsd60.sys.dcs\r\n')
