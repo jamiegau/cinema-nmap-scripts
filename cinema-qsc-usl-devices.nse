@@ -90,7 +90,7 @@ end
 local function socket_command(host, cmd)
 	local port = { number = 10001, protocol = 'tcp' }
 	local socket = nmap.new_socket()
-	socket:set_timeout(500)
+	socket:set_timeout(1000)
 
 	local catch = function()
 		print('Catch on connection')
@@ -98,22 +98,42 @@ local function socket_command(host, cmd)
 	end
 
 	local try = nmap.new_try(catch)
-
 	try(socket:connect(host.ip, port.number))
-
 	-- print('Send command [' .. all_trim(cmd) .. ']')
 	try(socket:send(cmd))
-
 	local response = try(socket:receive_lines(1))
 	socket:close()
 
-	local trim_response = all_trim(response)
-	-- print('response [' .. response .. ']')
 	--
 	-- fix a wierd bug: some times we get the serialNumber
-	-- with 300 in front of it.
+	-- Some times we get a random 3 digital number then a return then the real serial number.
 	-- no idea why and cannot reproduce. so...
 	-- So adding this code to try and sort it out.
+	-- if we have a return that has 2 ^M in it then try again to request the variable.
+	--
+	local _, nCount = string.gsub(response, "\n", "")
+	if nCount > 1 then
+		local f = assert(io.open("/tmp/cinema-qsc-usl-device.debug.txt", "a"))
+		f:write("ERR: " .. all_trim(cmd) .. " : " .. response .. "\n")
+		f:close()
+
+		stdnse.debug("response has two new-lines so try again. response = " .. nsedebug.tostr(response))
+		-- try again
+		local try2 = nmap.new_try(catch)
+		try2(socket:connect(host.ip, port.number))
+		try2(socket:send(cmd))
+		response = try2(socket:receive_lines(1))
+		socket:close()
+		stdnse.debug("try 2 result response = " .. nsedebug.tostr(response))
+
+		f = assert(io.open("/tmp/cinema-qsc-usl-device.debug.txt", "a"))
+		f:write("try2: " .. all_trim(cmd) .. " : " .. response .. "\n")
+		f:close()
+	end
+
+	local trim_response = all_trim(response)
+	stdnse.debug("trim_response = " .. nsedebug.tostr(trim_response))
+
 	if string.len(trim_response) == 7 and starts_with(trim_response, '300') then
 		stdnse.debug("DEAL WITH ERROR: response = " .. nsedebug.tostr(response))
 		-- write the exact string we got back from target
