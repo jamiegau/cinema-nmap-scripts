@@ -101,7 +101,7 @@ local function socket_command(host, cmd)
 	try(socket:connect(host.ip, port.number))
 	-- print('Send command [' .. all_trim(cmd) .. ']')
 	-- just read anything left in buffer, make sure its clean
-	local junk = try(socket:receive_lines(1))
+	local junk = socket:receive_lines(1)
 	stdnse.debug("Initial connect read any junk: junk = " .. nsedebug.tostr(junk))
 	try(socket:send(cmd))
 	local response = try(socket:receive_lines(1))
@@ -117,7 +117,7 @@ local function socket_command(host, cmd)
 	local _, nCount = string.gsub(response, "\n", "")
 	if nCount > 1 then
 		local f = assert(io.open("/tmp/cinema-qsc-usl-device.debug.txt", "a"))
-		f:write("ER1: " .. host .. ":" .. all_trim(cmd) .. " = [" .. response .. "]\n")
+		f:write("ER1: " .. host.ip .. ":" .. all_trim(cmd) .. " = [" .. response .. "]\n")
 		f:close()
 
 		stdnse.debug("response has two new-lines so try again. response = " .. nsedebug.tostr(response))
@@ -135,19 +135,19 @@ local function socket_command(host, cmd)
 	end
 
 	local trim_response = all_trim(response)
-	stdnse.debug("trim_response = " .. nsedebug.tostr(trim_response))
+	stdnse.debug(all_trim(cmd) .. " : " .. "trim_response = " .. nsedebug.tostr(trim_response))
 
 	if string.len(trim_response) == 7 and starts_with(trim_response, '300') then
 		stdnse.debug("DEAL WITH ERROR: response = " .. nsedebug.tostr(response))
 		-- write the exact string we got back from target
 		local f = assert(io.open("/tmp/cinema-qsc-usl-device.debug.txt", "a"))
-		f:write("ER2: " .. host .. ":" .. all_trim(cmd) .. " = [" .. response .. "]\n")
+		f:write("ER2: " .. host.ip .. ":" .. all_trim(cmd) .. " = [" .. response .. "]\n")
 		f:close()
 		trim_response = string.sub(trim_response, 4, -1)
 	end
 
 	local f = assert(io.open("/tmp/cinema-qsc-usl-device.debug.txt", "a"))
-	f:write("res: " .. host .. ":" .. all_trim(cmd) .. " = [" .. response .. "]\n")
+	f:write("res: " .. host.ip .. ":" .. all_trim(cmd) .. " = [" .. response .. "]\n")
 	f:close()
 
 	return trim_response
