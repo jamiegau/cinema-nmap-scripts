@@ -90,7 +90,7 @@ end
 local function socket_command(host, cmd)
 	local port = { number = 10001, protocol = 'tcp' }
 	local socket = nmap.new_socket()
-	socket:set_timeout(1000)
+	socket:set_timeout(400)
 
 	local catch = function()
 		print('Catch on connection')
@@ -100,6 +100,9 @@ local function socket_command(host, cmd)
 	local try = nmap.new_try(catch)
 	try(socket:connect(host.ip, port.number))
 	-- print('Send command [' .. all_trim(cmd) .. ']')
+	-- just read anything left in buffer, make sure its clean
+	local junk = try(socket:receive_lines(1))
+	stdnse.debug("Initial connect read any junk: junk = " .. nsedebug.tostr(junk))
 	try(socket:send(cmd))
 	local response = try(socket:receive_lines(1))
 	socket:close()
@@ -114,7 +117,7 @@ local function socket_command(host, cmd)
 	local _, nCount = string.gsub(response, "\n", "")
 	if nCount > 1 then
 		local f = assert(io.open("/tmp/cinema-qsc-usl-device.debug.txt", "a"))
-		f:write("ERR: " .. all_trim(cmd) .. " : " .. response .. "\n")
+		f:write("ER1: " .. host .. ":" .. all_trim(cmd) .. " = [" .. response .. "]\n")
 		f:close()
 
 		stdnse.debug("response has two new-lines so try again. response = " .. nsedebug.tostr(response))
@@ -138,13 +141,13 @@ local function socket_command(host, cmd)
 		stdnse.debug("DEAL WITH ERROR: response = " .. nsedebug.tostr(response))
 		-- write the exact string we got back from target
 		local f = assert(io.open("/tmp/cinema-qsc-usl-device.debug.txt", "a"))
-		f:write("ERR: " .. all_trim(cmd) .. " : " .. response .. "\n")
+		f:write("ER2: " .. host .. ":" .. all_trim(cmd) .. " = [" .. response .. "]\n")
 		f:close()
 		trim_response = string.sub(trim_response, 4, -1)
 	end
 
 	local f = assert(io.open("/tmp/cinema-qsc-usl-device.debug.txt", "a"))
-	f:write("res: " .. all_trim(cmd) .. " : " .. response .. "\n")
+	f:write("res: " .. host .. ":" .. all_trim(cmd) .. " = [" .. response .. "]\n")
 	f:close()
 
 	return trim_response
