@@ -76,36 +76,34 @@ local function all_trim(s)
 	return s:match("^%s*(.-)%s*$")
 end
 
-function TableConcat(t1, t2)
-	for i = 1, #t2 do
-		t1[#t1 + 1] = t2[i]
-	end
-	return t1
-end
-
 local function starts_with(str, start)
 	return str:sub(1, #start) == start
 end
 
-local function socket_command(host, cmd)
+local function socket_command_once(host, cmd)
 	local port = { number = 10001, protocol = 'tcp' }
 	local socket = nmap.new_socket()
 	socket:set_timeout(400)
 
 	local catch = function()
-		print('Catch on connection')
+		stdnse.debug('QSC-USL socket exception')
 		socket:close()
 	end
 
 	local try = nmap.new_try(catch)
 	try(socket:connect(host.ip, port.number))
-	-- print('Send command [' .. all_trim(cmd) .. ']')
 	-- just read anything left in buffer, make sure its clean
-	local junk = socket:receive_lines(1)
-	stdnse.debug("Initial connect read any junk: junk = " .. nsedebug.tostr(junk))
+	local junk_status, junk = socket:receive_lines(1)
+	stdnse.debug("Initial connect read any junk: status = " .. nsedebug.tostr(junk_status) ..
+		", data = " .. nsedebug.tostr(junk))
 	try(socket:send(cmd))
 	local response = try(socket:receive_lines(1))
 	socket:close()
+	return response
+end
+
+local function socket_command(host, cmd)
+	local response = socket_command_once(host, cmd)
 
 	--
 	-- fix a wierd bug: some times we get the serialNumber
@@ -116,22 +114,11 @@ local function socket_command(host, cmd)
 	--
 	local _, nCount = string.gsub(response, "\n", "")
 	if nCount > 1 then
-		local f = assert(io.open("/tmp/cinema-qsc-usl-device.debug.txt", "a"))
-		f:write("ER1: " .. host.ip .. ":" .. all_trim(cmd) .. " = [" .. response .. "]\n")
-		f:close()
-
 		stdnse.debug("response has two new-lines so try again. response = " .. nsedebug.tostr(response))
-		-- try again
-		local try2 = nmap.new_try(catch)
-		try2(socket:connect(host.ip, port.number))
-		try2(socket:send(cmd))
-		response = try2(socket:receive_lines(1))
-		socket:close()
+		-- A closed Nmap socket cannot be reconnected reliably. Make the retry
+		-- through a new socket so intermittent device responses do not abort the scan.
+		response = socket_command_once(host, cmd)
 		stdnse.debug("try 2 result response = " .. nsedebug.tostr(response))
-
-		f = assert(io.open("/tmp/cinema-qsc-usl-device.debug.txt", "a"))
-		f:write("try2: " .. all_trim(cmd) .. " : " .. response .. "\n")
-		f:close()
 	end
 
 	local trim_response = all_trim(response)
@@ -139,16 +126,8 @@ local function socket_command(host, cmd)
 
 	if string.len(trim_response) == 7 and starts_with(trim_response, '300') then
 		stdnse.debug("DEAL WITH ERROR: response = " .. nsedebug.tostr(response))
-		-- write the exact string we got back from target
-		local f = assert(io.open("/tmp/cinema-qsc-usl-device.debug.txt", "a"))
-		f:write("ER2: " .. host.ip .. ":" .. all_trim(cmd) .. " = [" .. response .. "]\n")
-		f:close()
 		trim_response = string.sub(trim_response, 4, -1)
 	end
-
-	local f = assert(io.open("/tmp/cinema-qsc-usl-device.debug.txt", "a"))
-	f:write("res: " .. host.ip .. ":" .. all_trim(cmd) .. " = [" .. response .. "]\n")
-	f:close()
 
 	return trim_response
 end
@@ -182,12 +161,12 @@ local function magiclines(s)
 	return s:gmatch("(.-)\n")
 end
 
-function Split(s, delimiter)
-	local result = {};
+local function split_literal(s, delimiter)
+	local result = {}
 	for match in (s .. delimiter):gmatch("(.-)" .. delimiter) do
-		table.insert(result, match);
+		table.insert(result, match)
 	end
-	return result;
+	return result
 end
 
 local function oldJsd100_search(search_str, body)
@@ -201,7 +180,7 @@ local function oldJsd100_search(search_str, body)
 	for i, line in ipairs(lines) do
 		-- print("line = " .. i .. ": " .. line)
 		if string.find(line, '<tr><td>' .. search_str .. '</td><td>') then
-			local line_array = Split(line, '</td><td>')
+			local line_array = split_literal(line, '</td><td>')
 			-- stdnse.debug("line_array = " .. nsedebug.tostr(line_array))
 			res = line_array[2]:gsub("</td></tr>", ""):gsub("[%s]", "")
 

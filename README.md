@@ -83,6 +83,10 @@ It is recommended to only scan for ports that are used for fingerprinting the kn
 
 It is recommended that in the ```nmap``` command, the ```-p``` argument should target the ports listed above.
 
+## Development validation
+
+Run `./test.sh` before committing changes. The test asks nmap to load and compile every cinema NSE script without scanning a network. If `luac` is installed, it also performs a Lua syntax check on each script.
+
 ## Example
 The following is an example of the initial script created.  This script targets the Dolby Cinema Players,  IMS1000, IMS2000 and is likely to work on DCP2000 and IMS3000 devices
 
@@ -271,4 +275,3 @@ PORT      STATE SERVICE          REASON
 10000/tcp open  snet-sensor-mgmt syn-ack ttl 61
 Final times for host: srtt: 3138 rttvar: 1372  to: 100000
 ```
-
