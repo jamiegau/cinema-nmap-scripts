@@ -18,4 +18,10 @@ fi
 # --script-help loads and compiles every script without scanning a network.
 nmap --script-help "$script_dir/" >/dev/null
 
+if command -v lua >/dev/null 2>&1; then
+	lua "$script_dir/tests/cp850.lua" "$script_dir"
+else
+	echo "Lua not installed; CP850 offline behaviour tests skipped" >&2
+fi
+
 echo "Cinema NSE scripts validated successfully"

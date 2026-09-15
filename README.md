@@ -6,6 +6,35 @@ As nmap can be intrusive on a network and generate a lot of scanning traffic or 
 ## Precaution
 Cinema networks typically have live sessions in play.  A basic nmap SYN scan and targeting only a smaller number of ports should have very little impact on the equipment, users utilising these scripts should still take precautions.  If this was to cause an issue, it is most likely an automation IP-socket-message from one device to another that may be lost.  This is "extremely" unlikely, however, the users of the scripts should be aware of this.
 
+**CP850-specific warning:** Juan Marin reported that rapid successive TCP
+connections locked the CP850 control port until a reboot, although audio playback
+continued. The CP850 script uses one connection with pauses between read-only
+queries. Do not run it in a tight loop or alongside other scans/pollers targeting
+the same processor. Prefer the targeted SYN scan below and avoid broad service
+version detection (`-sV`) on a live CP850.
+
+## Dolby CP850
+
+[`cinema-dolby-cp850.nse`](cinema-dolby-cp850.nse) was contributed by
+[Juan Marin (@kdmparqueastur-cpu)](https://github.com/kdmparqueastur-cpu) in
+[issue #1](https://github.com/jamiegau/cinema-nmap-scripts/issues/1), including
+live CP850 verification and the control-port precautions above. Thank you, Juan!
+
+From the repository directory, scan only the required fingerprint ports:
+
+```sh
+sudo nmap -n -sS -p 80,111,61408 --script ./cinema-dolby-cp850.nse <target>
+```
+
+The fingerprint requires TCP 61408 and HTTP port 80 open, with port 111 not open.
+The script queries `sys.macro_preset ?`, `sys.macro_name ?`, `sys.fader ?` and
+`sys.mute ?` over one paced connection. It reports the active macro, fader level
+and mute status, without changing any settings. No serial number or software
+version is reported because those queries were not verified.
+
+The reported `productName` is `CP850`, matching the tested unit. It is not a
+verified CP850-versus-CP950 model discriminator; CP950 remains untested.
+
 ## Status
 This should be considered alpha and at an early stage of development.
 It would be appreciated if any issues spotted by users be posted to the ISSUES section of the GitHub page for this software.
@@ -18,7 +47,8 @@ The following is the initial set of equipment that scripts will be created for.
 | Christie         | Projectors            | InDev  | Have documentation, all I need is access to some projectors. Help needed |
 | Dolby            | Player                | DONE   | IMS1000, IMS2000, IMS3000 (DCP2000 and similar era kit unknown.) Initial beta version done, needs testing by the community. |
 | Dolby            | Sound Processor CP750 | DONE   | Dolby CP750 Sound Processor |
-| Dolby            | Sound Processor CP850/CP950 | help | Different API from CP750, need access to these units, Any Helpers? |
+| Dolby            | Sound Processor CP850 | DONE | Contributed and tested on a live CP850 by Juan Marin; see CP850 usage and precautions below. |
+| Dolby            | Sound Processor CP950 | help | Reportedly shares the CP850 API, but not hardware-verified here. CP950 testing is welcome; the CP850 script does not independently distinguish the two models. |
 | Barco / Cinionic | Player                | InDev  | ICMP |
 | Barco / Cinionic | Projector             | DONE S1,S2 | Barco Series 1&2 ready for testing, S4 different and I would need direct access to one for implementation |
 | GDC              | Player                | DONE   | SX2001A, SX3000, SR1000, SX4000, needs testing |
@@ -85,7 +115,7 @@ It is recommended that in the ```nmap``` command, the ```-p``` argument should t
 
 ## Development validation
 
-Run `./test.sh` before committing changes. The test asks nmap to load and compile every cinema NSE script without scanning a network. If `luac` is installed, it also performs a Lua syntax check on each script.
+Run `./test.sh` before committing changes. The test asks nmap to load and compile every cinema NSE script without scanning a network. If `luac` is installed, it also performs a Lua syntax check on each script. If Lua 5.3 or later is installed, it runs offline CP850 tests covering the supplied replies, fingerprint checks, single-connection pacing and error cleanup. No live cinema equipment is contacted by these tests.
 
 ## Example
 The following is an example of the initial script created.  This script targets the Dolby Cinema Players,  IMS1000, IMS2000 and is likely to work on DCP2000 and IMS3000 devices
