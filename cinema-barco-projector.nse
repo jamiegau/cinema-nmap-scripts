@@ -1,24 +1,31 @@
 local nmap = require "nmap"
 local stdnse = require "stdnse"
 local snmp = require "snmp"
+local http = require "http"
+local json = require "json"
+local url = require "url"
 
 description = [[
-Detects socket fingerprint of Barco DCI cinema projector and flags if found.
-Will attempt to pull out software and firmware version of system
+Identifies Barco DCI cinema projectors and reads model, serial and firmware.
 
-Sockets required for scan, 21,22,80,1173,43680,43728
+Legacy S1/S2 ports: 21,22,80,1173,43680,43728. Series 4: 80 and/or 443.
 Port 43680 - S1
 Port 43728 - S2
 
-NOTE: not tested against Series4 projectors, very different API/socket implementation.
+Series 4 SP2K/SP4K: read-only REST identity queries on HTTP/HTTPS. HTTP may
+upgrade to HTTPS on the same host. No login attempts or control commands are
+sent by default. Optional credentials: cinema-barco-projector.username/password.
 
-Tool uses SNMP, OID for query data.
+Legacy projectors use SNMP GET queries; Series 4 uses HTTP GET only.
 ]]
 
 --------------------------------------------------------------------
 ---
 -- @usage
+-- nmap -sS -p80,443 --script=cinema-barco-projector <target>
 -- nmap -sS -p21,22,80,1173,43680,43728 --script=cinema-barco-projector --script-args 'getcerts=true' <target>
+-- @args cinema-barco-projector.username Optional Series 4 REST username.
+-- @args cinema-barco-projector.password Optional Series 4 REST password.
 -- @output
 -- PORT      STATE SERVICE
 -- 21/tcp    open  ftp
@@ -100,11 +107,21 @@ Tool uses SNMP, OID for query data.
 
 author = "James Gardiner"
 license = "Same as Nmap--See https://nmap.org/book/man-legal.html"
-categories = { "cinema", "safe", "intrusive" }
+categories = { "cinema", "safe", "discovery" }
 
--- if port 80 and port  21, 22, 1173, 43680, 43728 are the right state, we try and query the target
+local function port_open(host, number)
+	local state = nmap.get_port_state(host, { number = number, protocol = "tcp" })
+	return state ~= nil and state.state == "open"
+end
+
+local function legacy_fingerprint(host)
+	return port_open(host, 21) and port_open(host, 22) and port_open(host, 1173)
+		and (port_open(host, 43680) or port_open(host, 43728))
+end
+
+-- REST identification is safe on web ports; legacy SNMP is separately gated.
 portrule = function(host, port)
-	if port.number ~= 80 then
+	if port.number ~= 80 and port.number ~= 443 then
 		return false
 	end
 
@@ -112,36 +129,64 @@ portrule = function(host, port)
 		return false
 	end
 
-	-- if port 80 and all these following ports are open, we can assume its a Dolby player
-	local ftp = { number = 21, protocol = "tcp" }
-	local ftp_open = nmap.get_port_state(host, ftp)
-	local ssh = { number = 22, protocol = "tcp" }
-	local ssh_open = nmap.get_port_state(host, ssh)
-	local dci = { number = 1173, protocol = "tcp" }
-	local dci_open = nmap.get_port_state(host, dci)
-	local barcoS1 = { number = 43680, protocol = "tcp" }
-	local barcoS1_open = nmap.get_port_state(host, barcoS1)
-	local barcoS2 = { number = 43680, protocol = "tcp" }
-	local barcoS2_open = nmap.get_port_state(host, barcoS2)
-
-
-	local res = false
-	if ftp_open.state == 'open' and
-		ssh_open.state == 'open' and
-		dci_open.state == 'open' and
-		(barcoS1_open.state == 'open' or barcoS2_open.state == 'open') then
-		res = true
-	end
-	return res
+	-- Run once when both ports were scanned. Positive REST identity, not the
+	-- presence of a web server or a TI control port, determines the vendor.
+	return port.number == 80 or not port_open(host, 80)
 end
 
 -------------------------------------------------------------------------------------------------------------
 
 local function all_trim(s)
-	if s == nil then
+	if type(s) ~= "string" and type(s) ~= "number" then
 		return ''
 	end
-	return s:match("^%s*(.-)%s*$")
+	return tostring(s):match("^%s*(.-)%s*$")
+end
+
+local function series4_identity(host, port)
+	local rest_port = port
+	local options = { timeout = 3000, max_body_size = 4096, redirect_ok = false }
+	local username = stdnse.get_script_args('cinema-barco-projector.username')
+	local password = stdnse.get_script_args('cinema-barco-projector.password')
+	if username and password then
+		options.auth = { username = username, password = password }
+	end
+	local function read_property(name)
+		local path = '/rest/system/' .. name
+		options.scheme = rest_port.number == 443 and 'https' or 'http'
+		local response = http.get(host, rest_port, path, options)
+		if response and rest_port.number == 80 and
+			(response.status == 301 or response.status == 302 or response.status == 307 or response.status == 308) then
+			local location = response.header and response.header.location
+			local redirect = location and url.parse(location)
+			-- Never follow off-host redirects or send supplied credentials elsewhere.
+			if redirect and redirect.scheme == 'https' and redirect.host == host.ip
+				and (redirect.port == nil or tonumber(redirect.port) == 443)
+				and redirect.path == path and not redirect.userinfo and not redirect.query then
+				rest_port = { number = 443, protocol = 'tcp', service = 'https' }
+				options.scheme = 'https'
+				response = http.get(host, rest_port, path, options)
+			end
+		end
+		if not response or response.status ~= 200 or response.truncated
+			or type(response.body) ~= 'string' then return nil end
+		local ok, data = json.parse(response.body)
+		if not ok or type(data) ~= 'table' or type(data.result) ~= 'string' then return nil end
+		local value = all_trim(data.result)
+		if value == '' then return nil end
+		return value
+	end
+	local model = read_property('modelname')
+	if not model or not model:match('^SP[24]K%-%d+[%w%-]*$') then return nil end
+	local output = stdnse.output_table()
+	output.classification = 'dci-projector'
+	output.vendor = 'Barco'
+	output.productName = model
+	output.serialNumber = read_property('serialnumber')
+	-- Catcher maps the common NSE "version" field to softwareVersion.
+	output.version = read_property('firmwareversion')
+	output.familyName = read_property('familyname')
+	return output
 end
 
 local function hexencode(str)
@@ -151,11 +196,12 @@ end
 function get_snmp_IOD_value(host, port, iod)
 	local res = ''
 
-	local snmpHelper = snmp.Helper:new(host, port)
-	snmpHelper:connect()
-
-	local status, retvar = snmpHelper:get({ reqId = 28428 }, iod)
-	if status == false then
+	local snmpHelper = snmp.Helper:new(host, port, nil, { timeout = 2000 })
+	local connected = snmpHelper:connect()
+	local status, retvar
+	if connected then status, retvar = snmpHelper:get({ reqId = 28428 }, iod) end
+	if snmpHelper.socket then snmpHelper.socket:close() end
+	if not status or type(retvar) ~= 'table' or type(retvar[1]) ~= 'table' then
 		res = 'na'
 	else
 		res = all_trim(retvar[1][1])
@@ -166,6 +212,9 @@ end
 
 -- Now lets try and query the player for some useful information
 action = function(host, port)
+	local identity = series4_identity(host, port)
+	if identity then return identity end
+	if not legacy_fingerprint(host) then return nil end
 	local getcerts = stdnse.get_script_args('getcerts')
 	if getcerts == 'y' or getcerts == 'yes' or getcerts == 'true' then
 		getcerts = true

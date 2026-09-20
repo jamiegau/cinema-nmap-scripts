@@ -23,6 +23,10 @@ author = "James Gardiner"
 license = "Same as Nmap--See https://nmap.org/book/man-legal.html"
 categories = { "cinema", "safe", "intrusive" }
 
+local function port_state(host, number)
+	return nmap.get_port_state(host, { number = number, protocol = 'tcp' }) or { state = 'unknown' }
+end
+
 -- if port 80 and port  21, 22, 1173, 7142, 43728 are the right state, we try and query the target
 portrule = function(host, port)
 	if port.number ~= 80 then
@@ -33,17 +37,17 @@ portrule = function(host, port)
 		return false
 	end
 
-	-- if port 80 and all these following ports are open, we can assume its a Dolby player
+	-- These ports select candidates only; the action verifies NEC's model OID.
 	local ftp = { number = 21, protocol = "tcp" }
-	local ftp_open = nmap.get_port_state(host, ftp)
+	local ftp_open = port_state(host, ftp.number)
 	local ssh = { number = 22, protocol = "tcp" }
-	local ssh_open = nmap.get_port_state(host, ssh)
+	local ssh_open = port_state(host, ssh.number)
 	local dci = { number = 1173, protocol = "tcp" }
-	local dci_open = nmap.get_port_state(host, dci)
+	local dci_open = port_state(host, dci.number)
 	local necS1 = { number = 7142, protocol = "tcp" }
-	local necS1_open = nmap.get_port_state(host, necS1)
+	local necS1_open = port_state(host, necS1.number)
 	local necS2 = { number = 43728, protocol = "tcp" }
-	local necS2_open = nmap.get_port_state(host, necS2)
+	local necS2_open = port_state(host, necS2.number)
 
 	local res = false
 	if ftp_open.state ~= 'open' and
@@ -62,7 +66,7 @@ end
 -------------------------------------------------------------------------------------------------------------
 
 local function all_trim(s)
-	if s == nil or s == false then
+	if type(s) ~= 'string' and type(s) ~= 'number' then
 		return ''
 	end
 	s = tostring(s)
@@ -76,11 +80,12 @@ end
 function get_snmp_IOD_value(host, port, iod)
 	local res = ''
 
-	local snmpHelper = snmp.Helper:new(host, port)
-	snmpHelper:connect()
-
-	local status, retvar = snmpHelper:get({ reqId = 28428 }, iod)
-	if status == false then
+	local snmpHelper = snmp.Helper:new(host, port, nil, { timeout = 2000 })
+	local connected = snmpHelper:connect()
+	local status, retvar
+	if connected then status, retvar = snmpHelper:get({ reqId = 28428 }, iod) end
+	if snmpHelper.socket then snmpHelper.socket:close() end
+	if not status or type(retvar) ~= 'table' or type(retvar[1]) ~= 'table' then
 		res = 'na'
 	else
 		res = all_trim(retvar[1][1])
@@ -109,6 +114,9 @@ action = function(host, port)
 	--
 	-- productName/vModelName / .1.3.6.1.4.1.119.2.3.123.1.13.0
 	output.productName = get_snmp_IOD_value(host, snmp_port, '.1.3.6.1.4.1.119.2.3.123.1.13.0')
+	-- Port patterns overlap with other vendors. Require a real model from
+	-- NEC's private MIB before emitting a vendor/classification.
+	if output.productName == '' or output.productName == 'na' then return nil end
 	--
 	-- serialNumber/vSerialNoPJ .1.3.6.1.4.1.119.2.3.123.1.12.1.0
 	output.serialNumber = get_snmp_IOD_value(host, snmp_port, '.1.3.6.1.4.1.119.2.3.123.1.12.1.0')

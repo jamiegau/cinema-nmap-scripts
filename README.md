@@ -44,13 +44,13 @@ The following is the initial set of equipment that scripts will be created for.
 
 | Vendor           | type                  | Status | info |
 | ---------------- | --------------------- | ------ | ---- |
-| Christie         | Projectors            | InDev  | Have documentation, all I need is access to some projectors. Help needed |
+| Christie         | Projectors            | Experimental | Documentation-based CP2000/Solaria/CineLife/CineLife+ discovery. Offline and loopback tests only; Christie hardware validation needed. |
 | Dolby            | Player                | DONE   | IMS1000, IMS2000, IMS3000 (DCP2000 and similar era kit unknown.) Initial beta version done, needs testing by the community. |
 | Dolby            | Sound Processor CP750 | DONE   | Dolby CP750 Sound Processor |
 | Dolby            | Sound Processor CP850 | DONE | Contributed and tested on a live CP850 by Juan Marin; see CP850 usage and precautions below. |
 | Dolby            | Sound Processor CP950 | help | Reportedly shares the CP850 API, but not hardware-verified here. CP950 testing is welcome; the CP850 script does not independently distinguish the two models. |
 | Barco / Cinionic | Player                | InDev  | ICMP |
-| Barco / Cinionic | Projector             | DONE S1,S2 | Barco Series 1&2 ready for testing, S4 different and I would need direct access to one for implementation |
+| Barco / Cinionic | Projector             | S1/S2 + S4 | Legacy SNMP support plus read-only SP2K/SP4K REST identification; SP2K-9S hardware-tested. |
 | GDC              | Player                | DONE   | SX2001A, SX3000, SR1000, SX4000, needs testing |
 | Qube             | Player XP-D           | DONE   | XP-D |
 | Qube             | Player XP-I           | DONE   | XP-D script may work with XP-I but not expected.  Need access to a XP-I, Any helpers?|
@@ -109,13 +109,105 @@ For complex devices that contain numerous version information, please use your j
 
 It is recommended to only scan for ports that are used for fingerprinting the known cinema devices in use.  The NSE scripts in the header comments name the ports that should be included in a scan for fingerprinting the devices the script targets.  Otherwise, a list of all ports the script uses is as follows.
 
-```21,22,23,80,111,1125,1173,2000,4241,4242,5000,5900,8080,7142,9200,10000,10001,14500,43680,43728,49153,49155,61408```
+```21,22,23,80,443,111,1125,1173,2000,4241,4242,5000,5900,8080,7142,9200,10000,10001,14500,43680,43728,49153,49155,61408```
 
 It is recommended that in the ```nmap``` command, the ```-p``` argument should target the ports listed above.
 
 ## Development validation
 
-Run `./test.sh` before committing changes. The test asks nmap to load and compile every cinema NSE script without scanning a network. If `luac` is installed, it also performs a Lua syntax check on each script. If Lua 5.3 or later is installed, it runs offline CP850 tests covering the supplied replies, fingerprint checks, single-connection pacing and error cleanup. No live cinema equipment is contacted by these tests.
+Run `./test.sh` before committing changes. The test asks nmap to load and compile every cinema NSE script without scanning a network. If `luac` is installed, it also performs a Lua syntax check on each script. If Lua 5.3 or later is installed, it runs offline CP850 and projector tests covering identity replies, fingerprints, HTTPS upgrades, malformed responses, legacy fallback and socket cleanup. No live cinema equipment is contacted by these tests.
+
+### Christie cinema projectors (experimental)
+
+`cinema-christie-projector.nse` uses serial-over-Ethernet on TCP 5000, already
+included in Catcher's scan ports:
+
+```sh
+sudo nmap -n -sS -p5000 --script ./cinema-christie-projector.nse PROJECTOR_IP
+```
+
+For an explicitly configured alternative port, include it in `-p` and set
+`--script-args cinema-christie-projector.port=PORT`; the script never searches
+other ports automatically.
+
+The initial `PNG?` reply must contain a documented cinema projector type:
+41/42 (CP2000-ZX/M), 46 (Solaria/Series 2), 60 (CineLife/Series 3), or 71
+(CineLife+/Series 4). Internal controller/board types and unknown types are
+rejected. Open port 5000 alone does not identify Christie.
+
+One connection is used, with a 2.5-second connection/query timeout and bounded
+reply size. Only `PNG?` and selected `SST` group reads are sent. There are no
+logins, default passwords, configuration writes, power or playback commands.
+Disabled/restricted remote access can prevent or limit discovery; the script
+does not change access settings. Avoid repeated scans during performances.
+
+Output provides `classification=dci-projector`, `vendor=Christie`, `family`,
+and `version` (the primary CPU's PNG version, not an IMB or whole-package build).
+For type 46, model/serial enrichment reads `SST+CONF?` and, if needed,
+`SST+SERI?`. For types 60/71 it reads the documented `SST+SERI?` and
+`SST+SYST?` groups. Only recognised model labels and explicitly labelled
+projector chassis serials are accepted. Exact model and serial fields are
+omitted when unavailable; a component/IMB serial is never substituted.
+Types 41/42 get basic PNG identification only.
+
+**No Christie projector has been hardware-tested for this implementation.**
+The manuals establish the command families and reply format, but do not list
+all CineLife status-item labels or guarantee where an exact model is returned.
+Consequently modern model/serial enrichment is best-effort and needs field
+verification. The status labels/indices in the tests are synthetic examples,
+not evidence of a particular firmware's output. Unknown labels are deliberately
+ignored. Please report redacted discovery XML and identity-group replies when
+hardware becomes available.
+
+Primary documentation consulted:
+
+- [Solaria API Guide, 020-100966-01](https://www.christiedigital.com/globalassets/resources/public/020-100966-01-christie-lit-man-appl-solaria-api.pdf), PNG pp. 34-35 and SST p. 43: legacy device codes, configuration/serial groups, legacy status severity.
+- [CineLife 2.2.0 Serial Commands, 020-102714-01](https://www.christiedigital.com/globalassets/resources/public/020-102714-01-christie-lit-tech-ref-cinelife-v2.2.0.pdf), PNG p. 26, SST pp. 29-30: type 60, status reply fields and read-only groups.
+- [CineLife+ Serial Commands](https://www.christiedigital.com/globalassets/resources/public/020-103075-12-Christie-LIT-TECH-REF-CineLifePlus-API.pdf), pp. 7-10, 32-33 and 36-37: TCP 5000, framing, type 71, status groups and severity. The downloaded document identifies itself as 020-103075-11, January 2026, despite the URL's `-12` suffix.
+- [Christie Cinema technical-support FAQ](https://www.christiedigital.com/help-center/technical-support/cinema-tech-support-faq/): Series 2 serial-over-Ethernet port 5000.
+
+`./test.sh` includes mocked Christie tests. For a real Nmap socket/XML check
+against a **local synthetic fixture only**, run
+`python3 tests/christie-loopback.py`; it binds an OS-assigned localhost port.
+
+Catcher pins this repository to a commit in its backend Dockerfile. Update
+`CINEMA_NMAP_SCRIPTS_REF` to a validated revision and rebuild the backend image
+to include these changes. Afterwards run **Single Scan and Update** to replace
+an existing cached discovery record.
+
+### Barco Series 4 / SP projectors
+
+`cinema-barco-projector.nse` uses the Series 4 REST API's read-only
+`/rest/system/modelname`, `serialnumber`, `firmwareversion` and `familyname`
+properties. It requires a valid SP2K/SP4K model response before identifying a
+device as Barco; open ports alone are not proof of a vendor.
+
+```sh
+sudo nmap -n -sS -p80,443 --script ./cinema-barco-projector.nse PROJECTOR_IP
+```
+
+HTTP redirects to HTTPS are supported only on the same target IP and the same
+identity path. An existing Catcher scan that includes port 80 but not 443 still
+works with the projector's HTTP-to-HTTPS redirect. For HTTPS-only installations,
+include port 443. Only one result is emitted when both ports are scanned.
+
+No authentication or default-password guessing is performed unless credentials
+are supplied using `cinema-barco-projector.username` and
+`cinema-barco-projector.password`. Prefer a protected `--script-args-file` when
+credentials are required. No power, lens, shutter, macro or configuration
+commands are sent. The tested SP2K-9S permits these identity reads without a login.
+
+Output uses the established fields `classification=dci-projector`, `vendor=Barco`,
+`productName`, `serialNumber` and `version`. Catcher maps `version` to its Software
+column. Missing optional fields are omitted, not fabricated. SP4K uses the same
+documented API and is covered offline; it has not yet been hardware-tested here.
+Series 1/2 retain their legacy port fingerprint and SNMP path. The NEC script
+now requires a model returned by NEC's private MIB before emitting an NEC label.
+
+The script changes must be included in the Catcher backend image (or installed
+in its configured scripts directory), then run **Single Scan and Update** for an
+existing unclassified or incorrectly classified device. Merely updating the
+scripts does not rewrite cached discovery records.
 
 ## Example
 The following is an example of the initial script created.  This script targets the Dolby Cinema Players,  IMS1000, IMS2000 and is likely to work on DCP2000 and IMS3000 devices
