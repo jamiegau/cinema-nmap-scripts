@@ -57,8 +57,10 @@ original CP850 hardware test remains valid for the ASCII status queries.
 | Device family | Discovery available | Validation / limits |
 | --- | --- | --- |
 | Edge Senior IO | One read-only `get.ip` query; identity and software version; direct mode without a port scan | Query verified on Senior 1.1.3; script tested against captured fields and localhost simulator, not live Nmap on hardware. Fragile-stack precautions required. |
+| Dolby / Doremi players | Separately labelled Software, Firmware and Security Manager (SM) versions | WSDL-based SOAP parsing and real-Nmap localhost tests; new extraction not yet hardware-verified |
 | Dolby CP950 / CP950A | Read-only SOAP model, serial and software identity | Documentation-based; offline and real-Nmap local simulator tests, not hardware-tested |
 | Dolby CP850 | Paced ASCII macro, fader and mute reads; exact model when separately established | Contributor hardware-tested; shared ASCII-only identity is labelled as a family |
+| Barco ICMP / Alchemy | Read-only player identity, serial and software via one authenticated HTTPS connection on TCP 43758 | WSDL-based; real-Nmap TLS simulator-tested, not yet hardware-verified |
 | Barco SP2K / SP4K (Series 4) | HTTP/HTTPS REST model, serial, firmware and family | SP2K-9S hardware-tested; SP4K covered offline only |
 | Christie CP2000 / Solaria / CineLife / CineLife+ | Documented read-only cinema identity, plus model/serial where available | Offline and local simulator tests only; hardware verification needed |
 | NEC Series 1 / 2 | Existing SNMP discovery hardened against false vendor detection | Now requires an actual NEC model response; regression-tested offline |
@@ -76,11 +78,11 @@ The following is the initial set of equipment that scripts will be created for.
 | Vendor           | type                  | Status | info |
 | ---------------- | --------------------- | ------ | ---- |
 | Christie         | Projectors            | Experimental | Documentation-based CP2000/Solaria/CineLife/CineLife+ discovery. Offline and loopback tests only; Christie hardware validation needed. |
-| Dolby            | Player                | DONE   | IMS1000, IMS2000, IMS3000 (DCP2000 and similar era kit unknown.) Initial beta version done, needs testing by the community. |
+| Dolby / Doremi    | Player                | Implemented | IMS-family SOAP discovery with separate Software, Firmware and SM versions. Updated extraction is simulator-tested; hardware validation and older DCP-model coverage remain pending. |
 | Dolby            | Sound Processor CP750 | DONE   | Dolby CP750 Sound Processor |
 | Dolby            | Sound Processor CP850 | Hardware-tested | Contributed ASCII status reads; exact model requires separate identity. See CP850 precautions above. |
 | Dolby            | Sound Processor CP950 / CP950A | Experimental | Dedicated read-only SOAP identity script; documentation-based, simulator-tested, hardware validation needed. |
-| Barco / Cinionic | Player                | InDev  | ICMP |
+| Barco / Cinionic | Player                | Experimental | ICMP/Alchemy SMS SOAP 1.2 identity over HTTPS 43758. Single authenticated connection; documentation-based and TLS simulator-tested, hardware validation pending. |
 | Barco / Cinionic | Projector             | S1/S2 + S4 | Legacy SNMP support plus read-only SP2K/SP4K REST identification; SP2K-9S hardware-tested. |
 | GDC              | Player                | DONE   | SX2001A, SX3000, SR1000, SX4000, needs testing |
 | Qube             | Player XP-D           | DONE   | XP-D |
@@ -123,7 +125,7 @@ with `--exclude SENIOR_IP` and use the dedicated direct mode below instead.
 
 Once you have nmap installed and downloaded the Repo from Github, you will have the ```cinema-nmap-scripts``` directory available.  Use the following command to scan a projection network and apply all scripts to the scan:
 
-```sudo nmap -n -sS --open -p 21,22,23,80,443,111,1125,1173,2000,4241,4242,5000,5900,8080,7142,9090,9200,10000,10001,14500,43680,43728,49153,49155,61408 --script cinema-nmap-scripts/ <Target Ip range as for example: 10.1.2.1-254 or 10.1.2.0/24>```
+```sudo nmap -n -sS --open -p 21,22,23,80,443,111,1125,1173,2000,4241,4242,5000,5900,8080,7142,9090,9200,10000,10001,14500,43680,43728,43758,49153,49155,61408 --script cinema-nmap-scripts/ <Target Ip range as for example: 10.1.2.1-254 or 10.1.2.0/24>```
 
 
 ## Expected results from all devices detected
@@ -143,7 +145,7 @@ For complex devices that contain numerous version information, please use your j
 
 It is recommended to only scan for ports that are used for fingerprinting the known cinema devices in use.  The NSE scripts in the header comments name the ports that should be included in a scan for fingerprinting the devices the script targets.  Otherwise, a list of all ports the script uses is as follows.
 
-```21,22,23,80,443,111,1125,1173,2000,4241,4242,5000,5900,8080,7142,9090,9200,10000,10001,14500,43680,43728,49153,49155,61408```
+```21,22,23,80,443,111,1125,1173,2000,4241,4242,5000,5900,8080,7142,9090,9200,10000,10001,14500,43680,43728,43758,49153,49155,61408```
 
 It is recommended that in the ```nmap``` command, the ```-p``` argument should target the ports listed above.
 
@@ -152,13 +154,126 @@ It is recommended that in the ```nmap``` command, the ```-p``` argument should t
 Run `./test.sh` before committing changes. The test asks nmap to load and compile every cinema NSE script without scanning a network. If `luac` is installed, it also performs a Lua syntax check on each script. If Lua 5.3 or later is installed, it runs offline CP850 and projector tests covering identity replies, fingerprints, HTTPS upgrades, malformed responses, legacy fallback and socket cleanup. No live cinema equipment is contacted by these tests.
 
 Run `./test.sh --loopback` to additionally exercise real Nmap against local
-Christie TCP, Dolby SOAP and Senior TCP simulators (Python 3 required). These bind only
+Christie TCP, Dolby player/CP950 SOAP, Barco player TLS/SOAP and Senior TCP simulators (Python 3 required; the Barco TLS fixture also needs OpenSSL). These bind only
 OS-assigned localhost ports and do not contact cinema equipment. CP950 candidate
 selection and CP850/CP950 duplicate-suppression checks are included offline.
 Senior tests verify the captured reply format, fragmentation, rejection of
 incomplete/invalid replies, deadlines, socket cleanup and no application retry.
 The direct-mode simulator verifies exactly one TCP connection and one command;
 the port-mode simulator distinguishes the port-scan connection from the query.
+Dolby player tests cover all three versions, the captured IMS2000 `MD software`
+label, unknown/conflicting SM entries, namespace prefixes, XML escaping,
+malformed/oversized replies, optional-query failures and session logout.
+
+### Barco ICMP / Alchemy player (experimental)
+
+`cinema-barco-player.nse` replaces the old unfinished Dolby-template script.
+It uses the actual **Barco SMS 1.11 WSDL**, **UserAccounts.txt**, and **SMS API
+Recommendations v1 (2018-10-09)** bundled under Catcher's
+`SmsTools/Barco/sms_1.11`, together with the existing SmsTools SOAP integration.
+
+```sh
+nmap -n -p43758 --script ./cinema-barco-player.nse PLAYER_IP
+```
+
+The script uses SOAP 1.2 on `https://PLAYER_IP:43758/`. It makes one TLS
+connection with a 10-second connect timeout and bounded 10-second response
+deadlines, then calls `Login`, `GetProductInformation`, and `Logout` on that
+same connection. It never sends playback, ingest, reboot, settings or update
+commands. It does not reconnect/retry failed logins or commands, follow redirects,
+or fall back to plaintext HTTP. Transport errors close the socket. As with the
+existing SmsTools integration, self-signed TLS certificates are accepted;
+the scan does not authenticate the device certificate. Use trusted cinema networks.
+
+The default login is the documented monitoring account `Monitor` / `Monitor1234`,
+not the administrator account. If that account has been changed or disabled,
+provide an authorized account with `cinema-barco-player.username` and
+`cinema-barco-player.password` (prefer an appropriately protected Nmap
+`--script-args-file` to exposing credentials in shell history). Only these
+namespaced credentials are used; there is no password guessing or admin fallback.
+The script does not automatically use credentials stored on a Catcher screen.
+An alternate TLS port can be selected with `cinema-barco-player.soap-port=PORT`.
+
+Output includes `classification=dci-player`, `vendor=Barco`, `productName`,
+`serialNumber`, `mainSoftwareVersion`, a labelled `version`, and optional
+`model`/`hostname`. The separate `projectorModel` and `projectorHostname` fields
+must never replace the player's identity. ICMP, ICMP-X and Alchemy name aliases
+are supported; identifying words in a hostname or arbitrary XML do not suffice.
+Firmware and SM versions are **not guessed**: `GetProductInformation` defines
+only `Version`, and the WSDL does not define the inner XML schema returned by
+`GetVersionDetails`. Captured hardware responses are needed before adding such
+component extraction.
+
+Catcher must include TCP **43758** in its discovery port list. The companion
+Catcher source change adds this port; updating this scripts repository alone
+does not update an already installed Catcher application. Read-only
+identification uses three commands on one connection,
+in line with Barco's advice to minimize connections and avoid log flooding.
+Do not run repeated or overlapping broad scans on production cinema networks.
+
+**Not hardware-verified.** `tests/barco-player-loopback.py` runs actual Nmap
+against a synthetic HTTPS server with a temporary self-signed certificate.
+It enforces connection-bound authentication, namespace/operation names, and a
+three-command allowlist; tests also cover chunking, failures, redirects,
+malformed/oversized responses, false identities and cleanup without reconnecting.
+No live cinema equipment is contacted by these tests.
+
+### Dolby / Doremi player versions
+
+`cinema-dolby-player.nse` reports three top-level component fields as well as a
+human-readable summary, for example:
+
+```text
+mainSoftwareVersion: 2.8.30-0
+mainFirmwareVersion: 4.6.10-0
+securityManagerVersion: 6.1.135-0
+version: Software: 2.8.30-0; Firmware: 4.6.10-0; SM: 6.1.135-0
+```
+
+Software and Firmware come from `GetProductInformation`. SM comes from the
+named `GetSoftwareInventoryList` entry: `MD software`, `SM`, or an explicit
+Security Manager title. The Dolby/Doremi **Digital Cinema Server MIB and SNMP
+Description, 000494 v1.2**, pp. 9–11, names inventory entry 6 `MD software` and
+its version `SM Version` ([document mirror](https://www.scribd.com/document/1027158608/Dolby-Doremi-Digital-Cinema-Server-MIB-and-SNMP-Description-000494-v1-2)).
+That title also appears in the IMS2000 capture below. The script matches the
+title, not a positional array index, because SOAP inventory ordering can vary.
+Unknown, missing or conflicting SM entries produce `Not reported`; bundle,
+Web UI, BIOS, MD firmware and hardware-board versions are never used as SM.
+Other explicit SM title aliases are simulator-tested, not hardware-verified.
+
+The SOAP calls are read-only except for opening/closing the authentication
+session. The script logs out after gathering identity, including when an
+optional query fails. It does not install firmware or change player settings.
+Credentials default to the existing `manager`/`password` login and can be
+overridden with `cinema-dolby-player.username` and `.password`. Legacy global
+`username`, `password` and `getcerts` arguments remain supported. Certificate
+retrieval is opt-in via `cinema-dolby-player.getcerts=true`.
+
+The normal fingerprint still requires TCP 21, 22, 80, 5000 and 10000 to be open.
+`cinema-dolby-player.soap-port=PORT` explicitly bypasses that fingerprint for
+a known player or localhost testing. Do not use this override indiscriminately.
+
+**Catcher integration:** the matching Catcher change adds separate component
+fields, expands the summary to 512 characters, and only consumes script-level
+identity elements. Nested inventory `version`/`vendor` fields must not overwrite
+the device identity. Apply Catcher's `device_discovery.0006` migration and
+rescan the player after deploying both updates. Older saved summaries cannot
+be reliably split into components. A status-only scan reports differences;
+a Cinema Device scan accepts the newly detected baseline.
+
+### Deploying these script updates with Catcher
+
+Update the scripts used by the scanner, not just the checkout on a development
+machine. A Catcher backend image that clones this repository's `main` branch
+must be rebuilt without Docker's build cache to fetch the latest scripts.
+Older Dockerfiles pinned to a commit must also have their pin updated first.
+Recreate the service using the rebuilt image; building alone does not replace
+an already running container.
+
+Deploy the companion Catcher changes as well: the Barco scan-port addition and
+the Dolby component-field migration/parser/display changes described above.
+Then rescan the devices. These scripts do not automatically modify the Catcher
+database, install application migrations, or restart any service.
 
 ### Edge Senior IO (fragile network stack)
 

@@ -1,306 +1,213 @@
 local nmap = require "nmap"
 local stdnse = require "stdnse"
 local http = require "http"
+local slaxml = require "slaxml"
 
 description = [[
-Detects socket fingerprint of Dolby or Doremi DCI cinema players and flags if found.
-Will attempt to pull out software and firmware version of system
-
-Sockets required for scan, 21,22,80,5000,10000
-
-Tool uses SNMP, OID for query data
+Identifies Dolby/Doremi cinema players through read-only SystemInformation SOAP.
+Reports Software, Firmware and Security Manager separately and in a labelled
+version summary. SM is taken only from a named software-inventory entry, never
+from a hardware revision or by assuming it matches the main software version.
+Missing or conflicting SM information is explicitly reported as Not reported.
 ]]
-
---------------------------------------------------------------------
----
--- @usage
--- nmap -p21,22,80,5000,10000 --script=cinema-dolby-player --script-args 'username=manager,password=password,getcerts=true' <target>
--- @output
--- PORT    STATE SERVICE
--- to be create
-
 author = "James Gardiner"
 license = "Same as Nmap--See https://nmap.org/book/man-legal.html"
-categories = { "cinema", "safe", "intrusive" }
+categories = { "cinema", "safe", "discovery" }
 
--- if port 80 and port  21, 22, 5000 and 10000 are open, we try and query the system Doby Player
+-- @usage
+-- nmap -p21,22,80,5000,10000 --script=cinema-dolby-player TARGET
+-- @args cinema-dolby-player.username SOAP login (default manager; legacy username accepted).
+-- @args cinema-dolby-player.password SOAP password (legacy password accepted).
+-- @args cinema-dolby-player.getcerts Include certificates (default false; legacy getcerts accepted).
+-- @args cinema-dolby-player.soap-port Explicit SOAP port, bypassing the multi-port fingerprint.
+-- @output
+-- | cinema-dolby-player:
+-- |   classification: dci-player
+-- |   vendor: Dolby
+-- |   productName: IMS2000
+-- |   mainSoftwareVersion: 2.8.52
+-- |   mainFirmwareVersion: 4.6.12
+-- |   securityManagerVersion: 6.2.1
+-- |_  version: Software: 2.8.52; Firmware: 4.6.12; SM: 6.2.1
+
+local SOAP = "http://schemas.xmlsoap.org/soap/envelope/"
+local API = "http://www.doremilabs.com/dc/dcp/ws/v1_0"
+local LIMIT = 262144
+
+local function argument(name)
+  return stdnse.get_script_args("cinema-dolby-player." .. name)
+end
+
+local function soap_port()
+  local value = argument("soap-port")
+  if value == nil then return 80 end
+  if type(value) ~= "string" and type(value) ~= "number" then return nil end
+  local number = tonumber(value)
+  if number and number >= 1 and number <= 65535 and number % 1 == 0 then return number end
+end
+
 portrule = function(host, port)
-	if port.number ~= 80 then
-		return false
-	end
-
-	if port.state ~= "open" or port.protocol ~= "tcp" then
-		return false
-	end
-
-	-- if port 80 and all these following ports are open, we can assume its a Dolby player
-	local cp1 = { number = 21, protocol = "tcp" }
-	local cp1_open = nmap.get_port_state(host, cp1)
-	local cp2 = { number = 22, protocol = "tcp" }
-	local cp2_open = nmap.get_port_state(host, cp2)
-	local cp3 = { number = 5000, protocol = "tcp" }
-	local cp3_open = nmap.get_port_state(host, cp3)
-	local cp4 = { number = 10000, protocol = "tcp" }
-	local cp4_open = nmap.get_port_state(host, cp4)
-
-	local res = false
-	if cp1_open.state == 'open' and
-		cp2_open.state == 'open' and
-		cp3_open.state == 'open' and
-		cp4_open.state == 'open' then
-		res = true
-	end
-	return res
+  local number = soap_port()
+  if not number or port.number ~= number or port.protocol ~= "tcp" or port.state ~= "open" then return false end
+  if argument("soap-port") ~= nil then return true end
+  for _, required in ipairs({21, 22, 5000, 10000}) do
+    local state = nmap.get_port_state(host, {number=required, protocol="tcp"})
+    if not state or state.state ~= "open" then return false end
+  end
+  return true
 end
 
--------------------------------------------------------------------------------------------------------------
-
-local function all_trim(s)
-	if s == nil then
-		return ''
-	end
-	return s:match("^%s*(.-)%s*$")
+-- Parse expanded XML names instead of depending on the player's arbitrary
+-- 'sys:' prefix. Reject incomplete documents, excessive depth and DTDs.
+local function parse_xml(xml)
+  if xml:find("<!DOCTYPE", 1, true) or xml:find("<!ENTITY", 1, true) then return nil end
+  local root, stack, count = nil, {}, 0
+  local parser = slaxml.parser:new({
+    startElement = function(name, ns)
+      count = count + 1
+      assert(count <= 8192 and #stack < 24)
+      local node = {name=name, ns=ns, children={}, text=""}
+      if #stack == 0 then assert(root == nil); root = node
+      else table.insert(stack[#stack].children, node) end
+      stack[#stack + 1] = node
+    end,
+    closeElement = function(name, ns)
+      local node = stack[#stack]
+      assert(node and node.name == name and node.ns == ns)
+      stack[#stack] = nil
+    end,
+    text = function(value)
+      if #stack > 0 then stack[#stack].text = stack[#stack].text .. value
+      else assert(value:match("^%s*$")) end
+    end,
+  })
+  local ok = pcall(parser.parseSAX, parser, xml)
+  if ok and #stack == 0 then return root end
 end
 
-local function soap_login_query(host, port, username, password)
-	local path = 'http://' .. host.ip .. '/dc/dcp/ws/v1/SessionManagement'
-	local req
-	req = '<?xml version="1.0" encoding="UTF-8"?><SOAP-ENV:Envelope xmlns:SOAP-ENV="http://schemas.xmlsoap.org/soap/envelope/" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xmlns:ns0="http://schemas.xmlsoap.org/soap/envelope/" xmlns:ns1="http://www.doremilabs.com/dc/dcp/ws/v1_0"><SOAP-ENV:Header/><ns0:Body><ns1:Login><username>'
-		.. username .. '</username><password>' .. password .. '</password></ns1:Login></ns0:Body></SOAP-ENV:Envelope>'
-	-- print(req)
-
-	local result = http.post(host.ip, 80, path, nil, nil, req)
-	-- stdnse.pretty_printer(result)
-	-- print('BODY: ' .. result['body'])
-	if (result['status'] ~= 200 or result['content-length'] == 0) then
-		return false, 'Failed to Login, please supply username and password in arguments'
-	end
-	local sessionId = string.match(result['body'], "<sessionId>(.-)</sessionId>")
-	return true, sessionId
+local function child(node, name)
+  local found
+  for _, item in ipairs(node and node.children or {}) do
+    if item.name == name then
+      if found then return nil end
+      found = item
+    end
+  end
+  return found
 end
 
---
-local function soap_Hostname_query(host, port, sessionId)
-	local path = 'http://' .. host.ip .. '/dc/dcp/ws/v1/SystemInformation'
-	local req
-	req = '<?xml version="1.0" encoding="UTF-8"?><SOAP-ENV:Envelope xmlns:SOAP-ENV="http://schemas.xmlsoap.org/soap/envelope/" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xmlns:ns0="http://www.doremilabs.com/dc/dcp/ws/v1_0" xmlns:ns1="http://schemas.xmlsoap.org/soap/envelope/"><SOAP-ENV:Header/><ns1:Body><ns0:GetHostname><sessionId>'
-		.. sessionId .. '</sessionId></ns0:GetHostname></ns1:Body></SOAP-ENV:Envelope>'
-
-	local result = http.post(host.ip, 80, path, nil, nil, req)
-	-- stdnse.pretty_printer(result)
-	-- print('BODY: ' .. result['body'])
-	if (result['status'] ~= 200 or result['content-length'] == 0) then
-		return false, 'GetHostname Failed'
-	end
-
-	local HostnameTable = {}
-	HostnameTable['hostname'] = all_trim(string.match(result['body'], '<hostname>(.-)</hostname>'))
-	HostnameTable['screenName'] = all_trim(string.match(result['body'], '<screenName>(.-)</screenName>'))
-	return true, HostnameTable
+local function scalar(node, limit)
+  if not node or #node.children ~= 0 then return nil end
+  local text = node.text:match("^%s*(.-)%s*$")
+  if text == "" or #text > (limit or 100) or text:find("%c") then return nil end
+  if text:lower() == "unknown" or text:lower() == "n/a" or text == "-" then return nil end
+  return text
 end
 
---
-local function soap_GetProductInformation_query(host, port, sessionId)
-	local path = 'http://' .. host.ip .. '/dc/dcp/ws/v1/SystemInformation'
-	local req
-	req = '<?xml version="1.0" encoding="UTF-8"?><SOAP-ENV:Envelope xmlns:SOAP-ENV="http://schemas.xmlsoap.org/soap/envelope/" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xmlns:ns0="http://schemas.xmlsoap.org/soap/envelope/" xmlns:ns1="http://www.doremilabs.com/dc/dcp/ws/v1_0"><SOAP-ENV:Header/><ns0:Body><ns1:GetProductInformation><sessionId>'
-		.. sessionId .. '</sessionId></ns1:GetProductInformation></ns0:Body></SOAP-ENV:Envelope>'
-
-	local result = http.post(host.ip, 80, path, nil, nil, req)
-	-- stdnse.pretty_printer(result)
-	-- print('BODY: ' .. result['body'])
-	if (result['status'] ~= 200 or result['content-length'] == 0) then
-		return false, 'GetProductInformation Failed'
-	end
-
-	local ProdInfoTable = {}
-	ProdInfoTable['productName'] = all_trim(string.match(result['body'], '<sys:productName>(.-)</sys:productName>'))
-	ProdInfoTable['serialNumber'] = all_trim(string.match(result['body'], '<sys:serialNumber>(.-)</sys:serialNumber>'))
-	ProdInfoTable['mainSoftwareVersion'] = all_trim(string.match(result['body'],
-		'<sys:mainSoftwareVersion>(.-)</sys:mainSoftwareVersion>'))
-	ProdInfoTable['mainFirmwareVersion'] = all_trim(string.match(result['body'],
-		'<sys:mainFirmwareVersion>(.-)</sys:mainFirmwareVersion>'))
-	return true, ProdInfoTable
+local function escape(text)
+  return (tostring(text):gsub("&", "&amp;"):gsub("<", "&lt;"):gsub(">", "&gt;")
+    :gsub('"', "&quot;"):gsub("'", "&apos;"))
 end
 
---
-local function soap_GetSoftwareInventoryList_query(host, port, sessionId)
-	local path = 'http://' .. host.ip .. '/dc/dcp/ws/v1/SystemInformation'
-	local req
-	req = '<?xml version="1.0" encoding="UTF-8"?><SOAP-ENV:Envelope xmlns:SOAP-ENV="http://schemas.xmlsoap.org/soap/envelope/" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xmlns:ns0="http://www.doremilabs.com/dc/dcp/ws/v1_0" xmlns:ns1="http://schemas.xmlsoap.org/soap/envelope/"><SOAP-ENV:Header/><ns1:Body><ns0:GetSoftwareInventoryList><sessionId>'
-		.. sessionId .. '</sessionId></ns0:GetSoftwareInventoryList></ns1:Body></SOAP-ENV:Envelope>'
-
-	local result = http.post(host.ip, 80, path, nil, nil, req)
-	-- stdnse.pretty_printer(result)
-	-- print('BODY: ' .. result['body'])
-	if (result['status'] ~= 200 or result['content-length'] == 0) then
-		return false, 'GetSoftwareInventoryList Failed'
-	end
-
-	local SwInfoTable = {}
-	local counter = 0
-	for match_txt in (result['body']):gmatch '<sys:softwarePart>(.-)</sys:softwarePart>' do
-		SwInfoTable[counter] = {}
-		SwInfoTable[counter]['title'] = all_trim(string.match(match_txt, '<sys:title>(.-)</sys:title>'))
-		SwInfoTable[counter]['type'] = all_trim(string.match(match_txt, '<sys:type>(.-)</sys:type>'))
-		SwInfoTable[counter]['vendor'] = all_trim(string.match(match_txt, '<sys:vendor>(.-)</sys:vendor>'))
-		SwInfoTable[counter]['version'] = all_trim(string.match(match_txt, '<sys:version>(.-)</sys:version>'))
-		counter = counter + 1
-	end
-
-	return true, SwInfoTable
+local function query(host, number, service, operation, fields)
+  local request = '<s:Envelope xmlns:s="' .. SOAP .. '" xmlns:d="' .. API .. '"><s:Body><d:' .. operation .. '>'
+  for _, field in ipairs(fields) do
+    request = request .. '<' .. field[1] .. '>' .. escape(field[2]) .. '</' .. field[1] .. '>'
+  end
+  request = request .. '</d:' .. operation .. '></s:Body></s:Envelope>'
+  local ok, result = pcall(http.post, host, {number=number, protocol="tcp"},
+    '/dc/dcp/ws/v1/' .. service, {
+      timeout=5000, max_body_size=LIMIT, redirect_ok=false,
+      header={['Content-Type']='text/xml; charset="utf-8"', SOAPAction='""'},
+    }, nil, request)
+  if not ok or not result or result.status ~= 200 or result.truncated
+    or type(result.body) ~= "string" or #result.body > LIMIT then return nil end
+  local root = parse_xml(result.body)
+  if not root or root.name ~= "Envelope" or root.ns ~= SOAP then return nil end
+  local body = child(root, "Body")
+  if not body or body.ns ~= SOAP or #body.children ~= 1 then return nil end
+  local response = child(body, operation .. "Response")
+  if response and response.ns == API then return response end
 end
 
---
-local function soap_GetHardwareInventoryList_query(host, port, sessionId)
-	local path = 'http://' .. host.ip .. '/dc/dcp/ws/v1/SystemInformation'
-	local req
-	req = '<?xml version="1.0" encoding="UTF-8"?><SOAP-ENV:Envelope xmlns:SOAP-ENV="http://schemas.xmlsoap.org/soap/envelope/" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xmlns:ns0="http://schemas.xmlsoap.org/soap/envelope/" xmlns:ns1="http://www.doremilabs.com/dc/dcp/ws/v1_0"><SOAP-ENV:Header/><ns0:Body><ns1:GetHardwareInventoryList><sessionId>'
-		.. sessionId .. '</sessionId></ns1:GetHardwareInventoryList></ns0:Body></SOAP-ENV:Envelope>'
-
-	local result = http.post(host.ip, 80, path, nil, nil, req)
-	-- stdnse.pretty_printer(result)
-	-- print('BODY: ' .. result['body'])
-	if (result['status'] ~= 200 or result['content-length'] == 0) then
-		return false, 'GetHardtwareInventoryList Failed'
-	end
-
-	local HwInfoTable = {}
-	local counter = 0
-	for match_txt in (result['body']):gmatch '<sys:hardwarePart>(.-)</sys:hardwarePart>' do
-		HwInfoTable[counter] = {}
-		HwInfoTable[counter]['title'] = all_trim(string.match(match_txt, '<sys:title>(.-)</sys:title>'))
-		HwInfoTable[counter]['type'] = all_trim(string.match(match_txt, '<sys:type>(.-)</sys:type>'))
-		HwInfoTable[counter]['vendor'] = all_trim(string.match(match_txt, '<sys:vendor>(.-)</sys:vendor>'))
-		HwInfoTable[counter]['version'] = all_trim(string.match(match_txt, '<sys:version>(.-)</sys:version>'))
-		HwInfoTable[counter]['model'] = all_trim(string.match(match_txt, '<sys:model>(.-)</sys:model>'))
-		HwInfoTable[counter]['serial'] = all_trim(string.match(match_txt, '<sys:serial>(.-)</sys:serial>'))
-		HwInfoTable[counter]['status'] = all_trim(string.match(match_txt, '<sys:status>(.-)</sys:status>'))
-		counter = counter + 1
-	end
-
-	return true, HwInfoTable
+local function inventory(response, list_name, entry_name, fields)
+  local rows = {}
+  local list = child(response, list_name)
+  for _, entry in ipairs(list and list.children or {}) do
+    if entry.name == entry_name then
+      local row = {}
+      for _, field in ipairs(fields) do row[field] = scalar(child(entry, field)) end
+      rows[#rows + 1] = row -- Lua arrays start at one; don't lose the first part.
+    end
+  end
+  return rows
 end
 
---
-local function soap_GetCertificateList_query(host, port, sessionId)
-	local path = 'http://' .. host.ip .. '/dc/dcp/ws/v1/SystemInformation'
-	local req
-	req = '<?xml version="1.0" encoding="UTF-8"?><SOAP-ENV:Envelope xmlns:SOAP-ENV="http://schemas.xmlsoap.org/soap/envelope/" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xmlns:ns0="http://schemas.xmlsoap.org/soap/envelope/" xmlns:ns1="http://www.doremilabs.com/dc/dcp/ws/v1_0"><SOAP-ENV:Header/><ns0:Body><ns1:GetCertificateList><sessionId>'
-		.. sessionId .. '</sessionId></ns1:GetCertificateList></ns0:Body></SOAP-ENV:Envelope>'
-
-	local result = http.post(host.ip, 80, path, nil, nil, req)
-	-- stdnse.pretty_printer(result)
-	-- print('BODY: ' .. result['body'])
-	if (result['status'] ~= 200 or result['content-length'] == 0) then
-		return false, 'GetCertificateList Failed'
-	end
-
-	local CertInfoTable = {}
-	local counter = 0
-	for match_txt in (result['body']):gmatch '<sys:certificate>(.-)</sys:certificate>' do
-		CertInfoTable[counter] = {}
-		CertInfoTable[counter]['title'] = all_trim(string.match(match_txt, '<sys:title>(.-)</sys:title>'))
-		CertInfoTable[counter]['cert'] = all_trim(string.match(match_txt, '<sys:cert>(.-)</sys:cert>'))
-		-- Dropped adding the chain data as there appears to be a bug in that the full
-		-- chain TEXT is nto returned byt the SOAP command.  Plus it is rearly used
-		-- CertInfoTable[counter]['chain'] = all_trim(string.match(match_txt, '<sys:chain>(.-)</sys:chain>'))
-		counter = counter + 1
-	end
-
-	return true, CertInfoTable
+local function sm_version(rows)
+  local selected
+  -- Doremi MIB/SNMP Description 000494 v1.2 names inventory #6
+  -- 'MD software' and explicitly identifies its version as 'SM Version'.
+  local labels = {mdsoftware=true, sm=true, securitymanager=true, securitymanagersm=true,
+    smversion=true, smfirmware=true, smsoftware=true,
+    securitymanagerversion=true, securitymanagerfirmware=true, securitymanagersoftware=true}
+  for _, row in ipairs(rows) do
+    local label = (row.title or ""):lower():gsub("[^%w]", "")
+    label = label:gsub("^dolby", ""):gsub("^doremi", "")
+    if labels[label] then
+      -- Missing/conflicting entries cannot silently select another SM version.
+      if not row.version or (selected and selected ~= row.version) then return nil end
+      selected = row.version
+    end
+  end
+  return selected
 end
 
---
-
-function TableConcat(t1, t2)
-	for i = 1, #t2 do
-		t1[#t1 + 1] = t2[i]
-	end
-	return t1
-end
-
--- Now lets try and query the player for some useful information
 action = function(host, port)
-	-- get command line username and password
-	-- arguments, username, password, getcerts
-	local username = stdnse.get_script_args('username')
-	if username == nil then
-		username = 'manager'
-	end
-	local password = stdnse.get_script_args('password')
-	if password == nil then
-		password = 'password'
-	end
-	local getcerts = stdnse.get_script_args('getcerts')
-	if getcerts == 'y' or getcerts == 'yes' or getcerts == 'true' then
-		getcerts = true
-	else
-		getcerts = false
-	end
-	--
-	--
-	local login_res, sessionId = soap_login_query(host, port, username, password)
-	if not login_res then
-		return sessionId
-	end
-	--
-	-- Get Hostname
-	local Hostname_res, HostnameTable = soap_Hostname_query(host, port, sessionId)
-	if not Hostname_res then
-		return HostnameTable
-	end
-	--
-	-- Get basic information about device
-	local ProdInfo_res, ProdInfoTable = soap_GetProductInformation_query(host, port, sessionId)
-	if not ProdInfo_res then
-		return ProdInfoTable
-	end
-	--
-	-- Get GetSoftwareInventoryList
-	local SwInfo_res, SwInfoTable = soap_GetSoftwareInventoryList_query(host, port, sessionId)
-	if not SwInfo_res then
-		return SwInfoTable
-	end
-	--
-	-- Get GetSoftwareInventoryList
-	local HwInfo_res, HwInfoTable = soap_GetHardwareInventoryList_query(host, port, sessionId)
-	if not HwInfo_res then
-		return HwInfoTable
-	end
-	--
-	-- Get GetCertificateList
-	local CertInfo_res
-	local CertInfoTable
-	if getcerts == true then
-		CertInfo_res, CertInfoTable = soap_GetCertificateList_query(host, port, sessionId)
-		if not CertInfo_res then
-			return CertInfoTable
-		end
-	end
+  local number = soap_port()
+  if not number then return nil end
+  local username = argument("username") or stdnse.get_script_args('username') or 'manager'
+  local password = argument("password") or stdnse.get_script_args('password') or 'password'
+  local login = query(host, number, 'SessionManagement', 'Login', {{'username', username}, {'password', password}})
+  local session = scalar(child(login, 'sessionId'), 512)
+  if not session then return nil end
+  local session_fields = {{'sessionId', session}}
+  local function info(operation) return query(host, number, 'SystemInformation', operation, session_fields) end
 
-	local output = stdnse.output_table()
-	-- required variables are
-	--- classification, vendor, productName, serialNumber, softwareVersion
-	output.classification = 'dci-player'
-	output.vendor = 'Dolby'
-	output.productName = ProdInfoTable['productName']
-	output.serialNumber = ProdInfoTable['serialNumber']
-	output.version = ProdInfoTable['mainSoftwareVersion'] .. ', ' .. ProdInfoTable['mainFirmwareVersion']
-
-	output.hostname = HostnameTable['hostname']
-	output.screenName = HostnameTable['screenName']
-
-	output.mainSoftwareVersion = ProdInfoTable['mainSoftwareVersion']
-	output.mainFirmwareVersion = ProdInfoTable['mainFirmwareVersion']
-
-	output.SoftwareInfo = SwInfoTable
-
-	output.HardwareInfo = HwInfoTable
-
-	if getcerts == true then
-		output.CertInfo = CertInfoTable
-	end
-
-	return output
+  local ok, output = pcall(function()
+    local product = child(info('GetProductInformation'), 'productInformation')
+    local model = scalar(child(product, 'productName'))
+    if not model then return nil end
+    local software = inventory(info('GetSoftwareInventoryList'), 'softwarePartList', 'softwarePart', {'title','type','vendor','version'})
+    local result = stdnse.output_table()
+    result.classification = 'dci-player'
+    result.vendor = 'Dolby'
+    result.productName = model
+    result.serialNumber = scalar(child(product, 'serialNumber'))
+    result.mainSoftwareVersion = scalar(child(product, 'mainSoftwareVersion')) or 'Not reported'
+    result.mainFirmwareVersion = scalar(child(product, 'mainFirmwareVersion')) or 'Not reported'
+    result.securityManagerVersion = sm_version(software) or 'Not reported'
+    result.version = 'Software: ' .. result.mainSoftwareVersion .. '; Firmware: ' .. result.mainFirmwareVersion .. '; SM: ' .. result.securityManagerVersion
+    result.bundleVersion = scalar(child(product, 'bundleVersion'))
+    result.SoftwareInfo = software
+    result.HardwareInfo = inventory(info('GetHardwareInventoryList'), 'hardwarePartList', 'hardwarePart', {'title','type','vendor','version','model','serial','status'})
+    local hostname = info('GetHostname')
+    result.hostname = scalar(child(hostname, 'hostname'))
+    result.screenName = scalar(child(hostname, 'screenName'))
+    local getcerts = argument('getcerts') or stdnse.get_script_args('getcerts')
+    if getcerts == true or getcerts == 'y' or getcerts == 'yes' or getcerts == 'true' then
+      local certificates = child(info('GetCertificateList'), 'certificateList')
+      result.CertInfo = {}
+      for _, entry in ipairs(certificates and certificates.children or {}) do
+        if entry.name == 'certificate' then
+          local cert = child(entry, 'cert')
+          result.CertInfo[#result.CertInfo + 1] = {title=scalar(child(entry, 'title')), cert=cert and cert.text}
+        end
+      end
+    end
+    return result
+  end)
+  -- End our own SOAP session even when an optional query fails.
+  query(host, number, 'SessionManagement', 'Logout', session_fields)
+  if ok then return output end
+  stdnse.debug1('Dolby player information unavailable; session closed')
 end
