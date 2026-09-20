@@ -1,10 +1,23 @@
 # cinema-nmap-scripts
 This project contains a set of nmap scripts for use in scanning a projection network to discover what equipment is on that projection network and if possible, extract information from the equipment such as Vendor, Product, and version information.
 
-As nmap can be intrusive on a network and generate a lot of scanning traffic or overload a TCP-IP stack on some lightweight cinema equipment, the user is expected to utilise the scripts in a less impactful way.  For example, only ports used in fingerprinting a device should be scanned and not the many thousands as is performed in a general nmap scan.  A SYN scan or lightweight open socket scan that does not connect and open ta socket is recommended.
+Nmap can overload the TCP/IP stack on lightweight cinema equipment. Scan only
+the necessary devices and ports; do not assume a read-only command or SYN scan
+is harmless. For known fragile equipment, prefer a direct protocol query over
+a port scan. A TCP connect scan opens a connection; a SYN scan does not complete
+the handshake, but either can still trigger firmware defects.
 
 ## Precaution
-Cinema networks typically have live sessions in play.  A basic nmap SYN scan and targeting only a smaller number of ports should have very little impact on the equipment, users utilising these scripts should still take precautions.  If this was to cause an issue, it is most likely an automation IP-socket-message from one device to another that may be lost.  This is "extremely" unlikely, however, the users of the scripts should be aware of this.
+Cinema networks typically have live sessions in play. Device lockups have been
+reported: consequences can go beyond a missed automation message. Perform
+initial tests in a maintenance window, avoid overlapping scans/pollers, and
+have a recovery plan. Read-only describes the commands, not the reliability of
+the device's network stack. No scan profile here guarantees freedom from lockups.
+
+**Edge Senior warning:** a user reports Senior units locking up during Nmap
+scans. The exact trigger has not been isolated. Exclude known Seniors from broad
+scans (`--exclude SENIOR_IP` on the broad Nmap command) and use the direct-query
+mode below only when necessary. Do not repeatedly retry an unresponsive unit.
 
 **CP850-specific warning:** Juan Marin reported that rapid successive TCP
 connections locked the CP850 control port until a reboot, although audio playback
@@ -43,6 +56,7 @@ original CP850 hardware test remains valid for the ASCII status queries.
 
 | Device family | Discovery available | Validation / limits |
 | --- | --- | --- |
+| Edge Senior IO | One read-only `get.ip` query; identity and software version; direct mode without a port scan | Query verified on Senior 1.1.3; script tested against captured fields and localhost simulator, not live Nmap on hardware. Fragile-stack precautions required. |
 | Dolby CP950 / CP950A | Read-only SOAP model, serial and software identity | Documentation-based; offline and real-Nmap local simulator tests, not hardware-tested |
 | Dolby CP850 | Paced ASCII macro, fader and mute reads; exact model when separately established | Contributor hardware-tested; shared ASCII-only identity is labelled as a family |
 | Barco SP2K / SP4K (Series 4) | HTTP/HTTPS REST model, serial, firmware and family | SP2K-9S hardware-tested; SP4K covered offline only |
@@ -75,7 +89,7 @@ The following is the initial set of equipment that scripts will be created for.
 | INTEG            | Automation controller | DONE   | JNIOR 400 |
 | RLY8             | Automation controller | DONE   | generic IP based 8 output automation controller with Socket Control|
 | KMTronic         | Automation controller | DONE   | generic IP based 8 output automation controller with Web and UDP control |
-| Edge             | Automation controller | WAIT   | generic IP based 24 output automation controller |
+| Edge             | Senior IO automation controller | Implemented | Read-only TCP 1125 identity/version; hardware query verified on 1.1.3, NSE simulator-tested. Use direct mode and read the lockup warning. |
 | QSC-USL          | Sound Processor       | DONE   | JSD100, JSD60, CM8, IRC-28C, LSS-200 |
 | QSC              | Sound Processor       |        | Appreciate access to these devices to implement, please contact me |
 | DataSat          | Sound Processor       | DONE   | AP20 Sound processor by DataSat |
@@ -103,6 +117,9 @@ As part of the detection of equipment, when creating a nse script to detect cert
 Note: Some classifications are for completeness purposes only.  For example, pos-devices, IP-cameras are many and users of these scripts may want to implement their own NSE script for detecting the type of cameras they use.  Other general network switches and devices are not expected to have scripts in this repo but again, users may want to add to the scripts for internal use.
 
 # How to use for wildcard scan of a projection network
+
+**Do not include known fragile Senior units in this broad scan.** Exclude them
+with `--exclude SENIOR_IP` and use the dedicated direct mode below instead.
 
 Once you have nmap installed and downloaded the Repo from Github, you will have the ```cinema-nmap-scripts``` directory available.  Use the following command to scan a projection network and apply all scripts to the scan:
 
@@ -135,9 +152,86 @@ It is recommended that in the ```nmap``` command, the ```-p``` argument should t
 Run `./test.sh` before committing changes. The test asks nmap to load and compile every cinema NSE script without scanning a network. If `luac` is installed, it also performs a Lua syntax check on each script. If Lua 5.3 or later is installed, it runs offline CP850 and projector tests covering identity replies, fingerprints, HTTPS upgrades, malformed responses, legacy fallback and socket cleanup. No live cinema equipment is contacted by these tests.
 
 Run `./test.sh --loopback` to additionally exercise real Nmap against local
-Christie TCP and Dolby SOAP simulators (Python 3 required). These bind only
+Christie TCP, Dolby SOAP and Senior TCP simulators (Python 3 required). These bind only
 OS-assigned localhost ports and do not contact cinema equipment. CP950 candidate
 selection and CP850/CP950 duplicate-suppression checks are included offline.
+Senior tests verify the captured reply format, fragmentation, rejection of
+incomplete/invalid replies, deadlines, socket cleanup and no application retry.
+The direct-mode simulator verifies exactly one TCP connection and one command;
+the port-mode simulator distinguishes the port-scan connection from the query.
+
+### Edge Senior IO (fragile network stack)
+
+`cinema-edge-senior-io.nse` replaces the unfinished placeholder which queried
+the wrong port with blank commands. It now sends exactly `get.ip` followed by
+LF on TCP **1125**, over one connection. No configuration, power, reboot,
+serial-number guesses, fallback commands or application retries are used.
+It pauses 250 ms after connecting, allows 3 seconds to connect and 3 seconds
+to receive the complete reply, caps response data at 4 KiB / 128 reads, and
+closes the socket on success or failure. Those bounds limit load; they are not
+vendor-certified safe timings. TCP itself may retransmit packets.
+
+The read-only query was successfully run via PowerShell against a real Senior
+on 20 September 2026, returning these fields:
+
+```text
+Version 1.1.3
+IP Adr 010.120.246.031
+Subnet 255.255.255.000
+Router 010.120.246.254
+command.ack
+```
+
+Only the complete five-line signature is accepted, with validated IPv4 fields
+and a three-component numeric version. Identification is based on that observed
+protocol signature, not a manufacturer/model string supplied by the device.
+Output is `classification=automation-io`, `vendor=Edge`, `productName=Senior-IO`,
+`version=1.1.3`. No serial is returned by this query, so none is reported.
+Other firmware reply formats need verification before extending the parser.
+
+**Preferred for a known Senior: skip port scanning altogether.** From this
+repository, run against one explicitly known IP in a maintenance window:
+
+```sh
+nmap -n -sn -Pn --disable-arp-ping \
+  --script ./cinema-edge-senior-io.nse \
+  --script-args cinema-edge-senior-io.direct=true SENIOR_IP
+```
+
+This selects only the Senior script, disables DNS lookup, skips host-discovery
+probes and port scanning, and makes a single application connection. Normal
+network address resolution may still be needed to deliver TCP traffic.
+Direct mode produces an NSE **host-script** result rather than a port result;
+consumers that read only port-script results must be adapted before using it.
+Never use `-sV`, `-A`, `-O`, a script directory or a whole subnet with this recipe.
+Do not run it concurrently with another scanner or in a monitoring loop.
+
+For tools requiring port-script output, a narrowly scoped alternative is:
+
+```sh
+sudo nmap -n -Pn --disable-arp-ping -sS -p1125 \
+  --scan-delay 1s --max-parallelism 1 --max-retries 0 \
+  --script ./cinema-edge-senior-io.nse SENIOR_IP
+```
+
+This still sends a port probe before the application query, so direct mode is
+preferred. No port-probe retries means packet loss can cause missed detection.
+Nmap timing flags control scan probes, not NSE socket traffic; the script bounds
+its own traffic separately. See Nmap's [host discovery documentation](https://nmap.org/book/man-host-discovery.html)
+and [timing documentation](https://nmap.org/book/man-performance.html).
+
+Ordinary directory-based discovery still uses the port rule on open TCP 1125;
+it no longer depends on FTP/SSH/HTTP ports. Explicit direct mode disables that
+rule, and a per-host guard prevents repeat queries within the same Nmap run.
+There is no persistent/cross-process cooldown. An explicit alternative port can
+be supplied with `cinema-edge-senior-io.port=PORT` (also used by localhost tests).
+
+**Catcher integration limitation:** updating the script does not change
+Catcher's broader multi-port scan into direct mode or suppress other scripts.
+Exclude known fragile units from broad scan targets. Merely slowing the Senior
+script cannot protect the unit from traffic sent by other scanning stages.
+The new NSE implementation has been verified offline and with real Nmap against
+a local simulator, not by another live Nmap scan of the reported fragile unit.
 
 ### Dolby CP950 / CP950A (experimental)
 

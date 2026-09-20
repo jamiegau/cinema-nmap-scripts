@@ -28,6 +28,7 @@ if command -v lua >/dev/null 2>&1; then
 	lua "$script_dir/tests/cp950.lua" "$script_dir"
 	lua "$script_dir/tests/projectors.lua" "$script_dir"
 	lua "$script_dir/tests/christie.lua" "$script_dir"
+	lua "$script_dir/tests/senior.lua" "$script_dir"
 else
 	echo "Lua not installed; offline behaviour tests skipped" >&2
 fi
@@ -35,6 +36,7 @@ fi
 if [ "${1-}" = "--loopback" ]; then
     python3 "$script_dir/tests/christie-loopback.py"
     python3 "$script_dir/tests/cp950-loopback.py"
+    python3 "$script_dir/tests/senior-loopback.py"
 fi
 
 echo "Cinema NSE scripts validated successfully"
