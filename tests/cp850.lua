@@ -87,7 +87,7 @@ end)
 test("contributor's live response and single paced connection", function()
     local out = env.action(host, port)
     assert(out.classification == "sound-processor" and out.vendor == "Dolby")
-    assert(out.productName == "CP850" and out.macroPreset == "3")
+    assert(out.productName == "CP850/CP950 family" and out.macroPreset == "3")
     assert(out.macroName == "Non-Sync" and out.faderLevel == "3.7")
     assert(out.muteStatus == "Unmuted")
     assert(state.sockets == 1 and state.connects == 1 and state.closes == 1)
@@ -98,6 +98,18 @@ test("multiword macro and muted response", function()
     state.replies[4] = "sys.mute 1\r\n"
     local out = env.action(host, port)
     assert(out.macroName == "5.1 + Dolby Atmos" and out.muteStatus == "Muted")
+end)
+test("confirmed CP950 and CP950A skip all control-port connections", function()
+    for _, model in ipairs({'CP950','CP950A'}) do
+        host.registry={cinema_dolby_cp_model=model}
+        assert(env.action(host,port)==nil and state.sockets==0)
+    end
+    host.registry=nil
+end)
+test("confirmed CP850 keeps its exact model", function()
+    host.registry={cinema_dolby_cp_model='CP850'}
+    assert(env.action(host,port).productName=='CP850')
+    host.registry=nil
 end)
 test("unrecognised protocol rejected", function()
     state.replies[1] = "ERROR\r\n"; assert(env.action(host, port) == nil)

@@ -5,14 +5,17 @@ local nsedebug = require "nsedebug"
 
 
 description = [[
-Detects socket fingerprint of Dolby CP850 sound processor device and flags if found.
+Reads status from Dolby CP850-compatible sound processors.
 Reads the active macro preset/name plus fader and mute levels using read-only queries.
 
 The CP850 listens on the same TCP port as the CP750 (61408) but speaks a
 different API: commands carry no "cp750." prefix, and it answers
 sys.macro_preset / sys.macro_name, which the CP750 ignores. The CP950
-shares this API (per the Bitfocus Companion dolby-cinemaprocessor module),
-but this script was verified against a CP850 only.
+shares this API (Dolby CP950/CP950A Manual, Issue 13, pp. 166-167),
+but this script was verified against a CP850 only. Shared ASCII replies alone
+are labelled CP850/CP950 family. When the CP950 SOAP discovery script is also
+selected, it runs first: confirmed CP950/CP950A devices are skipped here, and
+confirmed CP850 devices retain their exact model name.
 
 WARNING: the CP850 command stack is fragile. It tolerates a single,
 unhurried connection; rapid successive connections wedged a live unit
@@ -33,7 +36,7 @@ between them. Do not run it in a loop against a CP850.
 -- | cinema-dolby-cp850:
 -- |   classification: sound-processor
 -- |   vendor: Dolby
--- |   productName: CP850
+-- |   productName: CP850/CP950 family
 -- |   macroPreset: 3
 -- |   macroName: Non-Sync
 -- |   faderLevel: 3.7
@@ -43,6 +46,9 @@ between them. Do not run it in a loop against a CP850.
 author = "Juan Marin"
 license = "Same as Nmap--See https://nmap.org/book/man-legal.html"
 categories = { "cinema", "safe", "intrusive" }
+-- Run after SOAP identification when both scripts are selected. Dependencies
+-- order selected scripts; they do not enable an unselected script.
+dependencies = { "cinema-dolby-cp950" }
 
 -- port 61408 must be open. The CP850 also serves its web UI on port 80
 -- (the CP750 does not) and, unlike the CP750, it does not listen on
@@ -124,6 +130,8 @@ end
 
 -- Now lets query the processor for macro, fader and mute status
 action = function(host, port)
+	local model = host.registry and host.registry.cinema_dolby_cp_model
+	if model == 'CP950' or model == 'CP950A' then return nil end
 	--
 	local output = stdnse.output_table()
 	-- required variables are
@@ -143,7 +151,8 @@ action = function(host, port)
 		return nil
 	end
 
-	output.productName = "CP850"
+	-- Shared ASCII replies cannot establish the exact model.
+	output.productName = model == 'CP850' and 'CP850' or 'CP850/CP950 family'
 	output.macroPreset = preset
 
 	local macro_name = replies["sys.macro_name ?"]:match("^sys%.macro_name%s+(.+)$")

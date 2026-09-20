@@ -32,8 +32,25 @@ The script queries `sys.macro_preset ?`, `sys.macro_name ?`, `sys.fader ?` and
 and mute status, without changing any settings. No serial number or software
 version is reported because those queries were not verified.
 
-The reported `productName` is `CP850`, matching the tested unit. It is not a
-verified CP850-versus-CP950 model discriminator; CP950 remains untested.
+The shared ASCII replies do not distinguish CP850 from CP950/CP950A. Without
+separate positive model evidence, `productName` is now `CP850/CP950 family`.
+When both Dolby scripts are selected, CP950 SOAP discovery runs first. A
+confirmed CP950/CP950A is skipped by the CP850 script (no extra control-port
+connection); a SOAP-confirmed CP850 retains its exact model name. Juan's
+original CP850 hardware test remains valid for the ASCII status queries.
+
+## Recent device additions
+
+| Device family | Discovery available | Validation / limits |
+| --- | --- | --- |
+| Dolby CP950 / CP950A | Read-only SOAP model, serial and software identity | Documentation-based; offline and real-Nmap local simulator tests, not hardware-tested |
+| Dolby CP850 | Paced ASCII macro, fader and mute reads; exact model when separately established | Contributor hardware-tested; shared ASCII-only identity is labelled as a family |
+| Barco SP2K / SP4K (Series 4) | HTTP/HTTPS REST model, serial, firmware and family | SP2K-9S hardware-tested; SP4K covered offline only |
+| Christie CP2000 / Solaria / CineLife / CineLife+ | Documented read-only cinema identity, plus model/serial where available | Offline and local simulator tests only; hardware verification needed |
+| NEC Series 1 / 2 | Existing SNMP discovery hardened against false vendor detection | Now requires an actual NEC model response; regression-tested offline |
+
+The detailed sections below distinguish implemented discovery from hardware-
+verified coverage. These additions do not imply control, ingest or TMS support.
 
 ## Status
 This should be considered alpha and at an early stage of development.
@@ -47,14 +64,14 @@ The following is the initial set of equipment that scripts will be created for.
 | Christie         | Projectors            | Experimental | Documentation-based CP2000/Solaria/CineLife/CineLife+ discovery. Offline and loopback tests only; Christie hardware validation needed. |
 | Dolby            | Player                | DONE   | IMS1000, IMS2000, IMS3000 (DCP2000 and similar era kit unknown.) Initial beta version done, needs testing by the community. |
 | Dolby            | Sound Processor CP750 | DONE   | Dolby CP750 Sound Processor |
-| Dolby            | Sound Processor CP850 | DONE | Contributed and tested on a live CP850 by Juan Marin; see CP850 usage and precautions below. |
-| Dolby            | Sound Processor CP950 | help | Reportedly shares the CP850 API, but not hardware-verified here. CP950 testing is welcome; the CP850 script does not independently distinguish the two models. |
+| Dolby            | Sound Processor CP850 | Hardware-tested | Contributed ASCII status reads; exact model requires separate identity. See CP850 precautions above. |
+| Dolby            | Sound Processor CP950 / CP950A | Experimental | Dedicated read-only SOAP identity script; documentation-based, simulator-tested, hardware validation needed. |
 | Barco / Cinionic | Player                | InDev  | ICMP |
 | Barco / Cinionic | Projector             | S1/S2 + S4 | Legacy SNMP support plus read-only SP2K/SP4K REST identification; SP2K-9S hardware-tested. |
 | GDC              | Player                | DONE   | SX2001A, SX3000, SR1000, SX4000, needs testing |
 | Qube             | Player XP-D           | DONE   | XP-D |
 | Qube             | Player XP-I           | DONE   | XP-D script may work with XP-I but not expected.  Need access to a XP-I, Any helpers?|
-| NEC              | Projectors            | DONE   | Series1 and Series2 projectors, needs testing |
+| NEC              | Projectors            | Hardened | Series 1/2 SNMP; requires positive model evidence to avoid false NEC labels. Hardware testing welcome. |
 | INTEG            | Automation controller | DONE   | JNIOR 400 |
 | RLY8             | Automation controller | DONE   | generic IP based 8 output automation controller with Socket Control|
 | KMTronic         | Automation controller | DONE   | generic IP based 8 output automation controller with Web and UDP control |
@@ -89,7 +106,7 @@ Note: Some classifications are for completeness purposes only.  For example, pos
 
 Once you have nmap installed and downloaded the Repo from Github, you will have the ```cinema-nmap-scripts``` directory available.  Use the following command to scan a projection network and apply all scripts to the scan:
 
-```sudo nmap -n -sS --open -p 21,22,23,80,111,1125,1173,2000,4241,4242,5000,5900,8080,7142,9200,10000,10001,14500,43680,43728,49153,49155,61408 --script cinema-nmap-scripts/ <Target Ip range as for example: 10.1.2.1-254 or 10.1.2.0/24>```
+```sudo nmap -n -sS --open -p 21,22,23,80,443,111,1125,1173,2000,4241,4242,5000,5900,8080,7142,9090,9200,10000,10001,14500,43680,43728,49153,49155,61408 --script cinema-nmap-scripts/ <Target Ip range as for example: 10.1.2.1-254 or 10.1.2.0/24>```
 
 
 ## Expected results from all devices detected
@@ -109,13 +126,60 @@ For complex devices that contain numerous version information, please use your j
 
 It is recommended to only scan for ports that are used for fingerprinting the known cinema devices in use.  The NSE scripts in the header comments name the ports that should be included in a scan for fingerprinting the devices the script targets.  Otherwise, a list of all ports the script uses is as follows.
 
-```21,22,23,80,443,111,1125,1173,2000,4241,4242,5000,5900,8080,7142,9200,10000,10001,14500,43680,43728,49153,49155,61408```
+```21,22,23,80,443,111,1125,1173,2000,4241,4242,5000,5900,8080,7142,9090,9200,10000,10001,14500,43680,43728,49153,49155,61408```
 
 It is recommended that in the ```nmap``` command, the ```-p``` argument should target the ports listed above.
 
 ## Development validation
 
 Run `./test.sh` before committing changes. The test asks nmap to load and compile every cinema NSE script without scanning a network. If `luac` is installed, it also performs a Lua syntax check on each script. If Lua 5.3 or later is installed, it runs offline CP850 and projector tests covering identity replies, fingerprints, HTTPS upgrades, malformed responses, legacy fallback and socket cleanup. No live cinema equipment is contacted by these tests.
+
+Run `./test.sh --loopback` to additionally exercise real Nmap against local
+Christie TCP and Dolby SOAP simulators (Python 3 required). These bind only
+OS-assigned localhost ports and do not contact cinema equipment. CP950 candidate
+selection and CP850/CP950 duplicate-suppression checks are included offline.
+
+### Dolby CP950 / CP950A (experimental)
+
+`cinema-dolby-cp950.nse` identifies the exact model through the Dolby
+SystemManagement compatibility SOAP service, normally on TCP 9090:
+
+```sh
+sudo nmap -n -sS -p9090,61408 --script ./cinema-dolby-cp950.nse PROCESSOR_IP
+```
+
+The script sends only `getDeviceInfo`, followed by `getSerialNumber` and
+`getSystemVersions` if needed. Output uses `classification=sound-processor`,
+`vendor=Dolby`, `productName=CP950` or `CP950A`, plus `serialNumber` and `version`
+when returned with recognised identity labels. Board/Atmos certificate serials
+are not substituted for the chassis serial. No default login, SOAP setter,
+reboot, macro, fader, mute or ASCII control-port command is sent.
+
+It requires positive model evidence, refuses redirects, limits each HTTP
+request to 2.5 seconds and 32 KiB, and rejects invalid/faulted XML. Authentication
+requirements, blocked SOAP access or unrecognised identity labels can prevent
+exact identification. Missing optional fields are omitted, not guessed.
+
+If an older Catcher scan includes only TCP 61408, that open port selects a
+candidate for a SOAP query to 9090; it does not open an ASCII connection. If
+both ports are scanned, the script runs once on 9090. An explicitly closed or
+filtered 9090 is not retried via 61408. For an alternative SOAP port, scan it
+and set `--script-args cinema-dolby-cp950.soap-port=PORT`.
+
+Source: **Dolby Cinema Processor CP950 and Dolby Atmos Cinema Processor CP950A
+Manual**, Issue 13, part 8800298, 15 August 2024: pp. 163-165 describe the SOAP
+API and CP850-compatible interface; pp. 166-168 describe the shared ASCII
+commands and SNMP identity support. [Official manual](https://professional.dolby.com/siteassets/products/cp950a/dolby_cp950-cp950a_manual_issue_13.pdf).
+Request names, namespaces, reply structure and endpoint come from Dolby's
+`SystemManagement.wsdl` / `SystemManagement.xsd` v1.0/v1.1 definitions already
+present in Catcher's `SmsTools/Dolby/wsdl/cp`. No proprietary MIB OIDs have been
+invented; the manual refers to a separate downloadable MIB, not included here.
+
+**Not hardware-tested.** The WSDL defines key/value replies but not all model
+and version key spellings. Recognised labels are deliberately conservative;
+fixtures are synthetic, not captured from a CP950. Hardware feedback is needed
+to confirm field naming and firmware-specific behaviour. `CP850/CP950 family`
+in results means the ASCII protocol was recognised but the exact model was not.
 
 ### Christie cinema projectors (experimental)
 
