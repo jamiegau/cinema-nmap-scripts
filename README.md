@@ -61,6 +61,7 @@ original CP850 hardware test remains valid for the ASCII status queries.
 | Dolby CP950 / CP950A | Read-only SOAP model, serial and software identity | Documentation-based; offline and real-Nmap local simulator tests, not hardware-tested |
 | Dolby CP850 | Paced ASCII macro, fader and mute reads; exact model when separately established | Contributor hardware-tested; shared ASCII-only identity is labelled as a family |
 | Barco ICMP / Alchemy | Read-only player identity, serial and software via one authenticated HTTPS connection on TCP 43758 | WSDL-based; real-Nmap TLS simulator-tested, not yet hardware-verified |
+| D-Cine dcp-cine-player 4.2.20+ | Anonymous HTTP discovery on TCP 8080: service version, issued serial, installation UUID and public certificate metadata | Documented native discovery API; offline and real-Nmap localhost tests. Live scan validation pending. |
 | Barco SP2K / SP4K (Series 4) | HTTP/HTTPS REST model, serial, firmware and family | SP2K-9S hardware-tested; SP4K covered offline only |
 | Christie CP2000 / Solaria / CineLife / CineLife+ | Documented read-only cinema identity, plus model/serial where available | Offline and local simulator tests only; hardware verification needed |
 | NEC Series 1 / 2 | Existing SNMP discovery hardened against false vendor detection | Now requires an actual NEC model response; regression-tested offline |
@@ -85,6 +86,7 @@ The following is the initial set of equipment that scripts will be created for.
 | Barco / Cinionic | Player                | Experimental | ICMP/Alchemy SMS SOAP 1.2 identity over HTTPS 43758. Single authenticated connection; documentation-based and TLS simulator-tested, hardware validation pending. |
 | Barco / Cinionic | Projector             | S1/S2 + S4 | Legacy SNMP support plus read-only SP2K/SP4K REST identification; SP2K-9S hardware-tested. |
 | GDC              | Player                | DONE   | SX2001A, SX3000, SR1000, SX4000, needs testing |
+| D-Cine           | dcp-cine-player       | Implemented | 4.2.20+ anonymous discovery API; no login/token needed. Offline and loopback-tested. |
 | Qube             | Player XP-D           | DONE   | XP-D |
 | Qube             | Player XP-I           | DONE   | XP-D script may work with XP-I but not expected.  Need access to a XP-I, Any helpers?|
 | NEC              | Projectors            | Hardened | Series 1/2 SNMP; requires positive model evidence to avoid false NEC labels. Hardware testing welcome. |
@@ -104,7 +106,7 @@ As part of the detection of equipment, when creating a nse script to detect cert
 | Classification | Description |
 | --- | --- |
 | projector | a DCI certified projector. |
-| dci-player | a DCI certified cinema player. |
+| dci-player | DCP cinema player / TMS integration category. Identification alone does not establish DCI certification; verify certification separately where required. |
 | e-player | a electronic media player such as a BluRay player, or device that plays domestic video codecs (MP4, MV1, MOV, etc) |
 | sound-processor | A typical cinema sound processor device including monitor or amplifiers. |
 | sound-device | An additional IP based device connected to the sound system. i.e. Networked Amps etc. |
@@ -154,7 +156,9 @@ It is recommended that in the ```nmap``` command, the ```-p``` argument should t
 Run `./test.sh` before committing changes. The test asks nmap to load and compile every cinema NSE script without scanning a network. If `luac` is installed, it also performs a Lua syntax check on each script. If Lua 5.3 or later is installed, it runs offline CP850 and projector tests covering identity replies, fingerprints, HTTPS upgrades, malformed responses, legacy fallback and socket cleanup. No live cinema equipment is contacted by these tests.
 
 Run `./test.sh --loopback` to additionally exercise real Nmap against local
-Christie TCP, Dolby player/CP950 SOAP, Barco player TLS/SOAP and Senior TCP simulators (Python 3 required; the Barco TLS fixture also needs OpenSSL). These bind only
+Christie TCP, Dolby player/CP950 SOAP, Barco player TLS/SOAP, Senior TCP and
+DCP-Cine Player HTTP/JSON simulators (Python 3 required; the Barco TLS fixture
+also needs OpenSSL). These bind only
 OS-assigned localhost ports and do not contact cinema equipment. CP950 candidate
 selection and CP850/CP950 duplicate-suppression checks are included offline.
 Senior tests verify the captured reply format, fragmentation, rejection of
@@ -164,6 +168,58 @@ the port-mode simulator distinguishes the port-scan connection from the query.
 Dolby player tests cover all three versions, the captured IMS2000 `MD software`
 label, unknown/conflicting SM entries, namespace prefixes, XML escaping,
 malformed/oversized replies, optional-query failures and session logout.
+
+### D-Cine dcp-cine-player
+
+`cinema-dcp-cine-player.nse` uses the anonymous discovery API introduced in
+**4.2.20**, documented in the player's
+[discovery guide](http://devs.digitall.net.au/digitall-group/dcp-cine-player/-/blob/b905348f7860ec0ba3f0788ce90d2845fc21d977/docs/player-discovery-api.md).
+This release is on `feature/4.2-workstation-sdi`; the repository's `main`
+branch was still 4.1.80 when the detector was implemented.
+
+```sh
+nmap -n -p8080 --script ./cinema-dcp-cine-player.nse PLAYER_IP
+```
+
+The normal wildcard script scan also includes this detector. TCP 8080 is already
+in the recommended port list, so no additional scan ports or credentials are needed.
+
+The script makes one anonymous `GET /api/player/v1/discovery`, validates both
+`d-cine.player-api.discovery.v1` and `dcp-cine-player`, and reports
+`vendor: D-Cine`, `productName: dcp-cine-player`, `version`, `mainSoftwareVersion`,
+`serialNumber` and `deviceId` where available. It uses the `dci-player` category
+for Catcher's DCP/TMS screen workflow; this is not a DCI certification assertion.
+It does not query authenticated status/device-info, log in, inspect content,
+change playback or follow returned endpoint URLs or HTTP redirects. Older
+players without the new API are not identified by guessing from open ports.
+
+`serialNumber` is the licence-issued product serial. A demo/unregistered player
+may have no serial and is still detected; the certificate serial is reported
+separately and never substituted. Certificate metadata is reported as supplied,
+without asserting its trust, validity, licence state or KDM authorization.
+Public leaf PEM output is opt-in and comes from the same response:
+
+```sh
+nmap -n -p8080 --script ./cinema-dcp-cine-player.nse \
+  --script-args 'cinema-dcp-cine-player.getcerts=true' PLAYER_IP
+```
+
+Use an explicit port override for a proxy or nonstandard listener. HTTP is the
+default on 8080; HTTPS is the default on an explicitly selected port 443, or can
+be selected directly. No automatic transport retry is performed:
+
+```sh
+nmap -n -p8443 --script ./cinema-dcp-cine-player.nse \
+  --script-args 'cinema-dcp-cine-player.port=8443,cinema-dcp-cine-player.scheme=https' PLAYER_IP
+```
+
+Requests have a 3-second socket timeout, a 128-KiB body cap and no HTTP response
+caching. Offline and loopback tests cover null metadata, separate product and
+certificate identities, malformed/oversized responses, redirects, port
+overrides, schema/product mismatches, optional PEM and rejection of appended
+keys or certificate chains. The player's own qualification documents record
+live anonymous API tests; the qualification player was subsequently stopped
+by its operator, so this NSE detector has not yet been scanned against it.
 
 ### Barco ICMP / Alchemy player (experimental)
 

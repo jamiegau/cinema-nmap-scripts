@@ -64,8 +64,8 @@ end
 
 local function parse_reply(reply)
   local lines = {}
-  for line in reply:gmatch("[^\r\n]+") do
-    line = line:match("^%s*(.-)%s*$")
+  for raw_line in reply:gmatch("[^\r\n]+") do
+    local line = raw_line:match("^%s*(.-)%s*$")
     if line ~= "" then lines[#lines + 1] = line end
   end
   if #lines ~= 5 or lines[5] ~= "command.ack" then return nil end

@@ -27,6 +27,7 @@ if command -v lua >/dev/null 2>&1; then
 	lua "$script_dir/tests/cp850.lua" "$script_dir"
 	lua "$script_dir/tests/cp950.lua" "$script_dir"
 	lua "$script_dir/tests/barco-player.lua" "$script_dir"
+	lua "$script_dir/tests/dcp-cine-player.lua" "$script_dir"
 	lua "$script_dir/tests/projectors.lua" "$script_dir"
 	lua "$script_dir/tests/christie.lua" "$script_dir"
 	lua "$script_dir/tests/senior.lua" "$script_dir"
@@ -40,6 +41,7 @@ if [ "${1-}" = "--loopback" ]; then
     python3 "$script_dir/tests/senior-loopback.py"
     python3 "$script_dir/tests/dolby-player-loopback.py"
     python3 "$script_dir/tests/barco-player-loopback.py"
+    python3 "$script_dir/tests/dcp-cine-player-loopback.py"
 fi
 
 echo "Cinema NSE scripts validated successfully"
