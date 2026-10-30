@@ -167,7 +167,7 @@ class BarcoTests(unittest.TestCase):
         self.assertEqual(self.connections, 1)
 
     def test_model_aliases_and_xml_entities(self):
-        for name in ('ICMP', 'ICMP-X', 'Barco Alchemy'):
+        for name in ('ICMP', 'ICMP-X', 'ICMP-XS', 'ICMP-X(S)', 'Barco Alchemy'):
             self.product(name=name, serial='TEST&123')
             self.assertEqual(self.discover()['serialNumber'], 'TEST&123')
         self.product(name='Media server', model='ICMP')

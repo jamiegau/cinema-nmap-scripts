@@ -60,7 +60,7 @@ original CP850 hardware test remains valid for the ASCII status queries.
 | Dolby / Doremi players | Separately labelled Software, Firmware and Security Manager (SM) versions | WSDL-based SOAP parsing and real-Nmap localhost tests; new extraction not yet hardware-verified |
 | Dolby CP950 / CP950A | Read-only SOAP model, serial and software identity | Documentation-based; offline and real-Nmap local simulator tests, not hardware-tested |
 | Dolby CP850 | Paced ASCII macro, fader and mute reads; exact model when separately established | Contributor hardware-tested; shared ASCII-only identity is labelled as a family |
-| Barco ICMP / Alchemy | Read-only player identity, serial and software via one authenticated HTTPS connection on TCP 43758 | WSDL-based; real-Nmap TLS simulator-tested, not yet hardware-verified |
+| Barco ICMP / Alchemy | Read-only player identity, serial and software via one authenticated HTTPS connection on TCP 43758 | WSDL-based; real-Nmap TLS simulator-tested and ICMP hardware-verified |
 | D-Cine dcp-cine-player 4.2.20+ | Anonymous HTTP discovery on TCP 8080: service version, issued serial, installation UUID and public certificate metadata | Documented native discovery API; offline and real-Nmap localhost tests. Live scan validation pending. |
 | Barco SP2K / SP4K (Series 4) | HTTP/HTTPS REST model, serial, firmware and family | SP2K-9S hardware-tested; SP4K covered offline only |
 | Christie CP2000 / Solaria / CineLife / CineLife+ | Documented read-only cinema identity, plus model/serial where available | Offline and local simulator tests only; hardware verification needed |
@@ -83,7 +83,7 @@ The following is the initial set of equipment that scripts will be created for.
 | Dolby            | Sound Processor CP750 | DONE   | Dolby CP750 Sound Processor |
 | Dolby            | Sound Processor CP850 | Hardware-tested | Contributed ASCII status reads; exact model requires separate identity. See CP850 precautions above. |
 | Dolby            | Sound Processor CP950 / CP950A | Experimental | Dedicated read-only SOAP identity script; documentation-based, simulator-tested, hardware validation needed. |
-| Barco / Cinionic | Player                | Experimental | ICMP/Alchemy SMS SOAP 1.2 identity over HTTPS 43758. Single authenticated connection; documentation-based and TLS simulator-tested, hardware validation pending. |
+| Barco / Cinionic | Player                | Experimental | ICMP/ICMP-XS/Alchemy SMS SOAP 1.2 identity over HTTPS 43758. Single authenticated connection; TLS simulator-tested and checked on an ICMP at a shared DP2K-10S address. ICMP-XS aliases are simulator-tested. |
 | Barco / Cinionic | Projector             | S1/S2 + S4 | Legacy SNMP support plus read-only SP2K/SP4K REST identification; SP2K-9S hardware-tested. |
 | GDC              | Player                | DONE   | SX2001A, SX3000, SR1000, SX4000, needs testing |
 | D-Cine           | dcp-cine-player       | Implemented | 4.2.20+ anonymous discovery API; no login/token needed. Offline and loopback-tested. |
@@ -726,3 +726,9 @@ PORT      STATE SERVICE          REASON
 10000/tcp open  snet-sensor-mgmt syn-ack ttl 61
 Final times for host: srtt: 3138 rttvar: 1372  to: 100000
 ```
+
+### Integrated Barco addresses
+
+A projector and its ICMP player can share an IP address. Preserve the complete identity reported by each detector rather than mixing the projector model with the player classification or serial. Some ICMP-XS installations can also provide audio processing; a model name by itself does not prove that the audio role is fitted.
+
+Legacy Barco projector discovery requires an open cinema control endpoint and a positive Barco model/private-MIB serial response. FTP, SSH and the TI control port are optional; closing one must not hide a real projector. The revised detector has been checked against a DP2K-10S/ICMP installation: the projector and player have independent serial numbers at the same address. Unknown TI package values are not presented as an installed firmware version.

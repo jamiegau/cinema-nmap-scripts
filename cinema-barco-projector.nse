@@ -115,23 +115,21 @@ local function port_open(host, number)
 end
 
 local function legacy_fingerprint(host)
-	return port_open(host, 21) and port_open(host, 22) and port_open(host, 1173)
-		and (port_open(host, 43680) or port_open(host, 43728))
+	-- FTP/SSH are optional services, not projector identity. Require the
+	-- control endpoint, then verify the model and Barco-private SNMP serial.
+	return port_open(host, 43680) or port_open(host, 43728)
 end
 
 -- REST identification is safe on web ports; legacy SNMP is separately gated.
 portrule = function(host, port)
-	if port.number ~= 80 and port.number ~= 443 then
-		return false
-	end
-
-	if port.state ~= "open" or port.protocol ~= "tcp" then
-		return false
-	end
-
-	-- Run once when both ports were scanned. Positive REST identity, not the
-	-- presence of a web server or a TI control port, determines the vendor.
-	return port.number == 80 or not port_open(host, 80)
+	if port.state ~= "open" or port.protocol ~= "tcp" then return false end
+	-- Select one scanned endpoint. A legacy projector can disable both web
+	-- services while keeping its cinema control endpoint and SNMP available.
+	if port.number == 80 then return true end
+	if port.number == 443 then return not port_open(host, 80) end
+	if port_open(host, 80) or port_open(host, 443) then return false end
+	if port.number == 43680 then return true end
+	return port.number == 43728 and not port_open(host, 43680)
 end
 
 -------------------------------------------------------------------------------------------------------------
@@ -212,8 +210,10 @@ end
 
 -- Now lets try and query the player for some useful information
 action = function(host, port)
-	local identity = series4_identity(host, port)
-	if identity then return identity end
+	if port.number == 80 or port.number == 443 then
+		local identity = series4_identity(host, port)
+		if identity then return identity end
+	end
 	if not legacy_fingerprint(host) then return nil end
 	local getcerts = stdnse.get_script_args('getcerts')
 	if getcerts == 'y' or getcerts == 'yes' or getcerts == 'true' then
@@ -234,13 +234,19 @@ action = function(host, port)
 	--
 	-- serialNumber .1.3.6.1.4.1.12612.220.11.2.2.1.0
 	output.serialNumber = get_snmp_IOD_value(host, snmp_port, '.1.3.6.1.4.1.12612.220.11.2.2.1.0')
+	local model = output.productName:upper():gsub('%s+', '')
+	local known_model = model:match('^DP[24]K%-[%w%-]+$') or
+		model == 'DP100' or model == 'DP90' or model == 'DP1200' or
+		model == 'DP1500' or model == 'DP2000' or model == 'DP3000'
+	if not known_model or not output.serialNumber:match('^%d+$') then return nil end
+
 	--
 	-- tiPackageVersion - .1.3.6.1.4.1.12612.220.11.1.2.12.0
 	local tiPackageVersion = get_snmp_IOD_value(host, snmp_port, '.1.3.6.1.4.1.12612.220.11.1.2.12.0')
 	-- tiSerialNumber - .1.3.6.1.4.1.12612.220.11.1.2.16.0
 	local tiSerialNumber = hexencode(get_snmp_IOD_value(host, snmp_port, '.1.3.6.1.4.1.12612.220.11.1.2.16.0'))
-	output.version = tiPackageVersion
-	output.tiPackageVersion = tiPackageVersion
+	output.version = tiPackageVersion ~= '' and tiPackageVersion ~= 'na' and tiPackageVersion ~= '0.0.0' and tiPackageVersion or nil
+	output.tiPackageVersion = output.version
 	output.tiSerialNumber = tiSerialNumber
 
 	-- enigmaVersion .1.3.6.1.4.1.12612.220.11.1.2.18.0

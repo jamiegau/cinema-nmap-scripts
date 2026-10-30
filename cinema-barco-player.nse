@@ -218,7 +218,7 @@ action = function(host, port)
     local model = scalar(child(info, 'Model', API))
     local function is_icmp(value)
       local normalized = (value or ''):lower():gsub('[^%w]', ''):gsub('^barco', '')
-      return normalized == 'icmp' or normalized == 'icmpx' or normalized == 'alchemy' or normalized == 'icmpalchemy'
+      return normalized == 'icmp' or normalized == 'icmpx' or normalized == 'icmpxs' or normalized == 'alchemy' or normalized == 'icmpalchemy'
     end
     if not is_icmp(name) and not is_icmp(model) then return end
     output = stdnse.output_table()

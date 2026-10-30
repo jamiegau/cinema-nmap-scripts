@@ -113,12 +113,29 @@ test('only explicitly supplied namespaced credentials are used', function()
 end)
 test('legacy Barco S2 fingerprint includes actual port 43728', function()
     state.status = 404
-    for _, p in ipairs({21,22,1173,43728}) do state.ports[p] = {state='open'} end
+    for _, p in ipairs({43728}) do state.ports[p] = {state='open'} end
     state.snmp['.1.3.6.1.2.1.1.1.0'] = 'DP2K-20C'
     state.snmp['.1.3.6.1.4.1.12612.220.11.2.2.1.0'] = '1190136617'
     local out = barco.action(host, port)
     assert(out.productName == 'DP2K-20C' and out.serialNumber == '1190136617')
     assert(state.closes > 0)
+end)
+test('legacy Barco works without web ports and never sends HTTP to a binary control port', function()
+    state.ports[43728] = {state='open'}
+    local binary = {number=43728,state='open',protocol='tcp'}
+    assert(barco.portrule(host,binary))
+    state.snmp['.1.3.6.1.2.1.1.1.0'] = 'DP2K-10S'
+    state.snmp['.1.3.6.1.4.1.12612.220.11.2.2.1.0'] = '5997087108'
+    assert(barco.action(host,binary).productName=='DP2K-10S')
+    assert(#state.requests==0)
+end)
+test('Barco control port alone and non-Barco SNMP cannot identify a projector', function()
+    state.status = 404
+    state.ports[43728] = {state='open'}
+    assert(barco.action(host, port) == nil)
+    state.snmp['.1.3.6.1.2.1.1.1.0'] = 'NC2000C'
+    state.snmp['.1.3.6.1.4.1.12612.220.11.2.2.1.0'] = '1190136617'
+    assert(barco.action(host, port) == nil)
 end)
 test('NEC missing ports do not crash and matching ports alone prove nothing', function()
     assert(not nec.portrule(host, port))
