@@ -36,7 +36,7 @@ Legacy projectors use SNMP GET queries; Series 4 uses HTTP GET only.
 -- |   vendor: Barco
 -- |   productName: DP2K-20C
 -- |   serialNumber: 1190136617
--- |   version: 4.5.454
+-- |   version: 1.16.199
 -- |   tiPackageVersion: 4.5.454
 -- |   tiSerialNumber: 01d96e261a000085
 -- |   enigmaVersion: P1.8(24)
@@ -245,8 +245,16 @@ action = function(host, port)
 	local tiPackageVersion = get_snmp_IOD_value(host, snmp_port, '.1.3.6.1.4.1.12612.220.11.1.2.12.0')
 	-- tiSerialNumber - .1.3.6.1.4.1.12612.220.11.1.2.16.0
 	local tiSerialNumber = hexencode(get_snmp_IOD_value(host, snmp_port, '.1.3.6.1.4.1.12612.220.11.1.2.16.0'))
-	output.version = tiPackageVersion ~= '' and tiPackageVersion ~= 'na' and tiPackageVersion ~= '0.0.0' and tiPackageVersion or nil
-	output.tiPackageVersion = output.version
+	-- BARCO-ME-DCP-MIB barcoPackageVersion is the overall projector
+	-- package. TIPackageVersion is a different component; an ICMP-equipped
+	-- DP2K-10S can report 0.0.0 there despite valid projector firmware.
+	local barcoPackageVersion = get_snmp_IOD_value(host, snmp_port, '.1.3.6.1.4.1.12612.220.11.2.2.8.0')
+	if barcoPackageVersion:match('^%d+%.%d+%.%d+[%.%d]*$')
+		and not barcoPackageVersion:match('^[0%.]+$') then
+		output.version = barcoPackageVersion
+		output.barcoPackageVersion = barcoPackageVersion
+	end
+	output.tiPackageVersion = tiPackageVersion ~= '' and tiPackageVersion ~= 'na' and tiPackageVersion or nil
 	output.tiSerialNumber = tiSerialNumber
 
 	-- enigmaVersion .1.3.6.1.4.1.12612.220.11.1.2.18.0

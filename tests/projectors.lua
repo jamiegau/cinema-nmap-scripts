@@ -137,6 +137,24 @@ test('Barco control port alone and non-Barco SNMP cannot identify a projector', 
     state.snmp['.1.3.6.1.4.1.12612.220.11.2.2.1.0'] = '1190136617'
     assert(barco.action(host, port) == nil)
 end)
+test('legacy firmware uses Barco package independently of TI and player versions', function()
+    state.status = 404
+    for _, p in ipairs({21,22,1173,43728}) do state.ports[p] = {state='open'} end
+    state.snmp['.1.3.6.1.2.1.1.1.0'] = 'DP2K-10S'
+    state.snmp['.1.3.6.1.4.1.12612.220.11.2.2.1.0'] = '5997087108'
+    state.snmp['.1.3.6.1.4.1.12612.220.11.1.2.12.0'] = '0.0.0'
+    state.snmp['.1.3.6.1.4.1.12612.220.11.2.2.8.0'] = '1.16.199'
+    local out = barco.action(host, port)
+    assert(out.version == '1.16.199' and out.barcoPackageVersion == '1.16.199')
+    assert(out.tiPackageVersion == '0.0.0')
+    state.snmp['.1.3.6.1.4.1.12612.220.11.1.2.12.0'] = '4.5.454'
+    for _, missing in ipairs({'', 'na', '0.0.0', false, 'not-a-version'}) do
+        state.snmp['.1.3.6.1.4.1.12612.220.11.2.2.8.0'] = missing
+        out = barco.action(host, port)
+        assert(out.version == nil and out.barcoPackageVersion == nil)
+        assert(out.tiPackageVersion == '4.5.454')
+    end
+end)
 test('NEC missing ports do not crash and matching ports alone prove nothing', function()
     assert(not nec.portrule(host, port))
     state.ports[43728] = {state='open'}

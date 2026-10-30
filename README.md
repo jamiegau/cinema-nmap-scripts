@@ -732,3 +732,10 @@ Final times for host: srtt: 3138 rttvar: 1372  to: 100000
 A projector and its ICMP player can share an IP address. Preserve the complete identity reported by each detector rather than mixing the projector model with the player classification or serial. Some ICMP-XS installations can also provide audio processing; a model name by itself does not prove that the audio role is fitted.
 
 Legacy Barco projector discovery requires an open cinema control endpoint and a positive Barco model/private-MIB serial response. FTP, SSH and the TI control port are optional; closing one must not hide a real projector. The revised detector has been checked against a DP2K-10S/ICMP installation: the projector and player have independent serial numbers at the same address. Unknown TI package values are not presented as an installed firmware version.
+
+Legacy Barco projector firmware is read from the read-only
+`BARCO-ME-DCP-MIB::barcoPackageVersion` (`1.3.6.1.4.1.12612.220.11.2.2.8.0`).
+The TI front-end package remains a separate component field and is never used
+as a substitute for projector firmware. This corrects the missing firmware on
+DP2K-10S projectors with ICMP modules, whose TI package can report `0.0.0`.
+The package query was hardware-verified on all three DP2K-10S projectors at Boronia, each reporting `1.16.199`.
