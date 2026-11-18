@@ -59,9 +59,9 @@ portrule = function(host, port)
 	local usl_open = nmap.get_port_state(host, usl)
 
 	local res = false
-	if ftp_open.state ~= 'open' and
-		ssh_open.state ~= 'open' and
-		usl_open.state == 'open' then
+	if (not ftp_open or ftp_open.state ~= 'open') and
+		(not ssh_open or ssh_open.state ~= 'open') and
+		usl_open and usl_open.state == 'open' then
 		res = true
 	end
 	return res
@@ -147,7 +147,7 @@ local function getHttpUrl(host, urlPath)
 	-- stdnse.debug("http GET = " .. nsedebug.tostr(get_res))
 
 	local res, body
-	if get_res.status == 404 then
+	if get_res.status ~= 200 or type(get_res.body) ~= 'string' then
 		res = false
 	else
 		res = true
@@ -194,6 +194,19 @@ local function oldJsd100_search(search_str, body)
 		end
 	end
 	return res
+end
+
+local function jsd60_page_value(body, label)
+	for row in body:gmatch('<[tT][rR][^>]*>(.-)</[tT][rR]%s*>') do
+		local cells = {}
+		for cell in row:gmatch('<[tT][dD][^>]*>(.-)</[tT][dD]%s*>') do
+			local text = cell:gsub('<[^>]+>', ''):gsub('&nbsp;', ' '):gsub('&#160;', ' ')
+			table.insert(cells, all_trim(text))
+		end
+		if cells[1] and cells[1]:lower() == label:lower() then
+			return cells[2]
+		end
+	end
 end
 
 -- Now lets try and query the player for some useful information
@@ -243,6 +256,18 @@ action = function(host, port)
 					productName = 'IRC-28C'
 					version = split(h1, ' ')[4]
 					classification = 'accessibility'
+				elseif string.find(page_title, 'JSD%-60') then
+					-- Older JSD-60 firmware exposes identity on the root page,
+					-- with neither of the newer ConfigFlash endpoints available.
+					local model = jsd60_page_value(page_body3, 'Model Number') or ''
+					local candidate = model:upper():match('(JSD%-60[A-Z]*)%s*$')
+					local suffix = candidate and candidate:sub(7)
+					local variants = {['']=true, L=true, D=true, LS=true, DS=true,
+						LX=true, DX=true, LN=true, DN=true}
+					if not candidate or not variants[suffix] then
+						return nil
+					end
+					productName = 'OLD-JSD-60'
 				elseif string.find(page_title, "JSD%-100") then -- Note dash -, needs special escpate char %
 					-- special case, a older firmware JSD-100
 					stdnse.debug('special case, a older firmware JSD-100')
@@ -333,6 +358,26 @@ action = function(host, port)
 		dspVersion = verTable[4]
 		version = PCBversion .. ',' .. bootloaderVersion .. ',' .. picVersion .. ',' .. dspVersion
 		--
+	elseif productName == 'OLD-JSD-60' then
+		local model = jsd60_page_value(page_body3, 'Model Number')
+		productName = model:upper():match('(JSD%-60[A-Z]*)%s*$')
+		classification = 'sound-processor'
+		serialNumber = jsd60_page_value(page_body3, 'Serial Number')
+		theaterName = jsd60_page_value(page_body3, 'Theater Name')
+		theaterNumber = jsd60_page_value(page_body3, 'Theater Number')
+		hostname = jsd60_page_value(page_body3, 'Host Name')
+		picVersion = jsd60_page_value(page_body3, 'PIC Version')
+		dspVersion = jsd60_page_value(page_body3, 'DSP Version')
+		local frontPanel = jsd60_page_value(page_body3, 'Front Panel Version')
+		local versions = {}
+		for _, item in ipairs({{'PIC', picVersion}, {'DSP', dspVersion}, {'Front panel', frontPanel}}) do
+			if item[2] and item[2] ~= '' then
+				table.insert(versions, item[1] .. ': ' .. item[2])
+			end
+		end
+		if #versions > 0 then
+			version = table.concat(versions, '; ')
+		end
 	elseif productName == 'OLD-JSD-100' then
 		-- stdnse.debug("OLD-JSD-100 and page_body3 = " .. page_body3)
 		-- stdnse.debug("OLD-JSD-100 and page_body3 = " .. nsedebug.tostr(page_body3))
@@ -372,6 +417,9 @@ action = function(host, port)
 
 	-- required variables are
 	--- classification, vendor, productName, serialNumber, softwareVersion
+	if classification == 'na' or productName == 'na' then
+		return nil
+	end
 	output.classification = classification
 	output.vendor = 'QSC-USL'
 	-- local productName
